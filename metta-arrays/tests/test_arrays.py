@@ -606,7 +606,9 @@ def test_install_takes_a_context_as_well_as_a_space():
 def test_embedding_store_runs_on_numpy(am):  # noqa: D103  -- pytest discovers or injects this callable; its descriptive name states the contract
     space = am._new_space()
     store = arrays.EmbeddingStore(space, name="npk")
-    internal_knn, internal_embed = arrays._SPACE_STORES[(space.name, "npk")]
+    routes = arrays._store_routes(space, "npk")
+    assert routes is not None, "the store recorded no routes in its own space"
+    internal_knn, internal_embed = routes
     assert (
         registered()[internal_knn].effect
         is EffectClass.nondeterministicReadOnly
@@ -620,6 +622,29 @@ def test_embedding_store_runs_on_numpy(am):  # noqa: D103  -- pytest discovers o
     assert [p[0] for p in pairs] == [S.dog, S.cat]
     scores = [float(p[1]) for p in pairs]
     assert scores == sorted(scores, reverse=True)
+
+
+def test_a_stores_record_dies_with_its_space(am):
+    """A dropped space takes its store record with it, and names are POOLED.
+
+    The record was a module-global dict keyed by ``(space name, store name)``
+    and nothing removed an entry when its space went, so the next space to be
+    handed the recycled anonymous name read a closed store's internal
+    operations. This asserts the recycling happens, because a test that never
+    reuses the name proves nothing about the record that outlived it.
+    """
+    first = am._new_space()
+    reused = first.name
+    arrays.EmbeddingStore(first, name="dropk")
+    assert arrays._store_routes(first, "dropk") is not None
+    first.drop()
+
+    second = am._new_space()
+    try:
+        assert second.name == reused, "the name pool did not recycle, so this proves nothing"
+        assert arrays._store_routes(second, "dropk") is None
+    finally:
+        second.drop()
 
 
 def test_embedding_store_takes_a_context_as_well_as_a_space():
@@ -637,12 +662,17 @@ def test_embedding_store_takes_a_context_as_well_as_a_space():
     try:
         store = arrays.EmbeddingStore(context, name="ctxk")
         store.add(S.dog, numpy.array([1.0, 0.0]))
-        assert arrays._SPACE_STORES[(context.self.name, "ctxk")]
+        # The store's routes are a row in the space's own catalog, so this
+        # reads what the space holds rather than what a process-wide dict
+        # remembers. A dict keyed by the space's NAME outlived the space, and
+        # anonymous names are pooled.
+        routes = arrays._store_routes(context.self, "ctxk")
+        assert routes is not None
         (group,) = context.run("!(collapse (ctxk-knn (tensor (1.0 0.0)) 1))")
         assert [pair[0] for pair in group[0]] == [S.dog]
     finally:
         arrays.uninstall(context)
-        for name in arrays._SPACE_STORES.pop((context.self.name, "ctxk")):
+        for name in routes:
             context.self.unregister_op(name)
         context.close()
 

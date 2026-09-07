@@ -18,13 +18,20 @@ from types import SimpleNamespace
 import pytest
 from metta_benchmarking import (
     CPU_SECONDS,
+    LOAD_PER_CORE_CEILING,
+    PERF_CONTROL_REFUSED,
     BenchmarkBaseline,
+    MeasurementRefusedError,
     _run_perf,
     benchmark_case,
     benchmark_counter_slope,
     count_atoms,
+    load_per_core,
     measure_counters,
     measure_instructions,
+    measured_main,
+    refusal_is_fatal,
+    time_is_measurable,
 )
 
 from bench import CASES, _write_merged_json
@@ -407,7 +414,9 @@ def test_measure_counters_refuses_a_counter_perf_did_not_produce(monkeypatch):
         return 0, "", "<not counted>,,instructions:u,0,0.00,,\n"
 
     monkeypatch.setattr("metta_benchmarking._run_perf", run)
-    with pytest.raises(RuntimeError, match="did not return a numeric instructions:u"):
+    # `<not counted>` is the box refusing rather than the workload answering, so
+    # the refusal carries its own type and names the knob that decides it.
+    with pytest.raises(MeasurementRefusedError, match="never armed"):
         measure_counters(["cases", "boot"])
 
 
@@ -1002,3 +1011,203 @@ def test_the_recording_cpu_door_never_compares_where_the_gating_one_does(tmp_pat
         baseline.observe_cpu("crossing", 0.0)
     with pytest.raises(KeyError, match="no counter observation"):
         baseline.observe_cpu("never-measured", 0.400)
+
+
+def test_a_refused_window_is_told_apart_from_a_workload_that_failed(monkeypatch):
+    """The box refusing to count and the tree answering wrongly are two answers.
+
+    A controlled workload that never got perf's acknowledgement exits
+    PERF_CONTROL_REFUSED, and a run whose counter never armed reports
+    `<not counted>` where a number belongs. Both mean no measurement was
+    taken, so both raise MeasurementRefusedError. Every OTHER nonzero exit is the
+    workload's own failure and stays an ordinary RuntimeError, which is what
+    keeps a real regression from reading as contention and passing.
+    """
+    def refused(*_command, **_perf):
+        return PERF_CONTROL_REFUSED, "", "Events disabled\nworkload: perf did not acknowledge\n"
+
+    monkeypatch.setattr("metta_benchmarking._run_perf", refused)
+    with pytest.raises(MeasurementRefusedError, match="never opened"):
+        measure_instructions(["cases", "boot"], controlled=True)
+
+    def uncounted(*_command, **_perf):
+        return 0, "", "<not counted>,,instructions:u,0,100.00,,\n"
+
+    monkeypatch.setattr("metta_benchmarking._run_perf", uncounted)
+    with pytest.raises(MeasurementRefusedError, match="never armed"):
+        measure_instructions(["cases", "boot"])
+
+    def broken(*_command, **_perf):
+        return 3, "", "workload: the operation answered 0, expected 2000\n"
+
+    monkeypatch.setattr("metta_benchmarking._run_perf", broken)
+    with pytest.raises(RuntimeError, match="perf stat failed with exit 3") as failure:
+        measure_instructions(["cases", "boot"])
+    assert not isinstance(failure.value, MeasurementRefusedError)
+
+
+def test_a_benchmark_lane_skips_a_refusal_locally_and_refuses_it_in_ci(monkeypatch, capsys):
+    """One policy for every benchmark entry point, and it depends on CI alone.
+
+    A developer's box is shared, so a PMU another session holds is a note and
+    a SKIP; a CI runner that cannot count is a broken runner, so there the same
+    refusal is an error and an exit 1. An ordinary answer passes through either
+    way.
+
+    The local skip is PERF_CONTROL_REFUSED and not 0, because check.sh reads
+    that number as `skipped` and 0 as `ok`, and a lane that compared nothing
+    must not read the same as one that compared every row: mork-bench reported
+    `ok` on four of five full gate runs while another session held the PMU.
+    """
+    def refuses() -> int:
+        msg = "the measured window never opened"
+        raise MeasurementRefusedError(msg)
+
+    monkeypatch.delenv("CI", raising=False)
+    assert measured_main(refuses) == PERF_CONTROL_REFUSED
+    assert PERF_CONTROL_REFUSED != 0, "a skip that exits 0 reads as ok"
+    local = capsys.readouterr()
+    assert "note: the box refused the measurement" in local.out
+    assert "never opened" in local.out
+
+    monkeypatch.setenv("CI", "true")
+    assert measured_main(refuses) == 1
+    continuous = capsys.readouterr()
+    assert "error: this benchmark lane measured nothing" in continuous.err
+    assert "never opened" in continuous.err
+
+    assert measured_main(lambda: 0) == 0
+    assert measured_main(lambda: 1) == 1
+
+
+def test_a_row_may_declare_a_wider_inference_allowance_than_the_default(tmp_path):
+    """The instruction side has taken a per-row band since it was written.
+
+    The inference side did not, so a row whose count MEASURABLY moves more than
+    four with nothing but the state of the checkout reported a regression
+    forever. The C seat's boot is that row: it reads about twenty-five higher
+    in a tree whose tracked files have been written over, deterministically,
+    with no source difference behind it. A declaration widens the allowance on
+    BOTH sides, and a row that declares nothing keeps the four.
+    """
+    document = {
+        "schema": 1,
+        "benchmarks": {
+            "declared": {
+                "unit": "boots",
+                "operations": 1,
+                "inferences": 1000,
+                "inference_allowance": 32,
+            },
+            "default": {"unit": "boots", "operations": 1, "inferences": 1000},
+        },
+    }
+    path = tmp_path / "baseline.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    baseline = BenchmarkBaseline(path)
+
+    # Inside the declaration and outside the default, on the regression side.
+    baseline.observe_counter("declared", unit="boots", operations=1, samples=[1025, 1025, 1025])
+    with pytest.raises(AssertionError, match="plus the 4 inference allowance"):
+        baseline.observe_counter("default", unit="boots", operations=1, samples=[1025, 1025, 1025])
+
+    # And on the improvement side, which is the half a stale-high pin hides in.
+    baseline.observe_counter("declared", unit="boots", operations=1, samples=[975, 975, 975])
+    with pytest.raises(AssertionError, match="minus the 4 inference allowance"):
+        baseline.observe_counter("default", unit="boots", operations=1, samples=[975, 975, 975])
+
+    # A move past the declaration still fails, which is what keeps it a gate.
+    with pytest.raises(AssertionError, match="plus the 32 inference allowance"):
+        baseline.observe_counter("declared", unit="boots", operations=1, samples=[1040, 1040, 1040])
+
+
+def test_a_declared_inference_allowance_survives_a_re_pin(tmp_path):
+    """Re-pinning re-measures the count; it does not re-decide the row's noise."""
+    path = tmp_path / "baseline.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "benchmarks": {
+                    "boot": {
+                        "unit": "boots",
+                        "operations": 1,
+                        "inferences": 1000,
+                        "inference_allowance": 32,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    baseline = BenchmarkBaseline(path, update=True)
+    baseline.observe_counter("boot", unit="boots", operations=1, samples=[1100, 1100, 1100])
+    baseline.finish()
+    written = json.loads(path.read_text(encoding="utf-8"))["benchmarks"]["boot"]
+    assert written["inferences"] == 1100
+    assert written["inference_allowance"] == 32
+
+
+def test_a_time_derived_counter_stops_deciding_on_an_oversubscribed_box():
+    """One runnable process per core is where task-clock stops pricing the work.
+
+    Below it every runnable process still has a core; above it the reading
+    prices the queue. The C seat's baseline records its CPU pins as taken at
+    loadavg 9 to 30 on a 32-core box, 0.28 to 0.94 of a core each, and records
+    what happens further up: a task-clock triple spread 38% to 64% at loadavg
+    30 while instructions:u over the same runs spread 0.00002% to 0.129%.
+    """
+    assert LOAD_PER_CORE_CEILING == 1.0
+    assert load_per_core() >= 0.0
+    assert time_is_measurable() == (load_per_core() <= LOAD_PER_CORE_CEILING)
+
+
+def test_one_line_decides_whether_a_refusal_is_also_red(monkeypatch):
+    """Three lanes draw it, so it is defined once.
+
+    A runner that cannot measure is a broken runner and a lane that passes
+    without measuring is worse than a red one; a developer's box is shared and
+    a contended PMU is not a code change.
+    """
+    monkeypatch.delenv("CI", raising=False)
+    assert refusal_is_fatal() is False
+    monkeypatch.setenv("CI", "false")
+    assert refusal_is_fatal() is False
+    monkeypatch.setenv("CI", "true")
+    assert refusal_is_fatal() is True
+
+
+def test_a_baseline_says_what_checkout_length_its_pins_were_taken_at(tmp_path):
+    """A pin that moves with the path says which path, or says nothing.
+
+    The C seat's boot instruction count scales with the length of the engine
+    path the process resolves, about 0.045% per character, so the pin is true
+    of one checkout and the lane has to be able to tell it is somewhere else.
+    A baseline with no such counter says nothing and every row compares.
+    """
+    silent = tmp_path / "silent.json"
+    silent.write_text(json.dumps({"schema": 1, "benchmarks": {}}), encoding="utf-8")
+    assert BenchmarkBaseline(silent).pinned_checkout_path_length() is None
+
+    speaking = tmp_path / "speaking.json"
+    speaking.write_text(
+        json.dumps(
+            {"schema": 1, "benchmarks": {}, "measurement": {"checkout_path_length": 29}}
+        ),
+        encoding="utf-8",
+    )
+    assert BenchmarkBaseline(speaking).pinned_checkout_path_length() == 29
+
+    for nonsense in ("29", True, None, 1.5):
+        broken = tmp_path / "broken.json"
+        broken.write_text(
+            json.dumps(
+                {
+                    "schema": 1,
+                    "benchmarks": {},
+                    "measurement": {"checkout_path_length": nonsense},
+                }
+            ),
+            encoding="utf-8",
+        )
+        assert BenchmarkBaseline(broken).pinned_checkout_path_length() is None

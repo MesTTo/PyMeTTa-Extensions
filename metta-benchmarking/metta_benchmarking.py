@@ -28,6 +28,21 @@ Guarantees:
     test_baseline_without_configuration_stamp_refuses_counter_comparison]
   - perf instruction measurements fail loudly when perf or its event output
     fails [tested test_measure_instructions_parses_perf_csv]
+  - a box that would not count is a MeasurementRefusedError and not a moved
+    row: perf answering `<not counted>` for a requested event, and a controlled
+    workload exiting PERF_CONTROL_REFUSED because no acknowledgement arrived,
+    both raise it, while every other nonzero exit stays an ordinary
+    RuntimeError, which is the workload's own failure
+    [tested: test_a_refused_window_is_told_apart_from_a_workload_that_failed;
+    commit=11afdcdbad5bbbe37168b5d8528c23a21c42b4b6]
+  - one policy decides what a benchmark lane does with that refusal, so no two
+    lanes can drift into disagreeing: measured_main skips it with a name and
+    exits PERF_CONTROL_REFUSED on a desk, which check.sh's summary renders
+    `skipped` without failing the run, and refuses it with an error and exits 1
+    where CI=true. It is NOT 0: a lane that measured nothing and exits 0 reads
+    `ok`, indistinguishable from one that compared every row
+    [tested: test_a_benchmark_lane_skips_a_refusal_locally_and_refuses_it_in_ci;
+    commit=0e33a6c1666b3d28c546c252ecaa8eeb87bee759]
   - one perf run may count several events, matched on the event NAME field so
     a unit-carrying event reads beside a bare one, and it hands back each
     run's own standard output so a workload can report a counter perf cannot
@@ -74,6 +89,7 @@ import json
 import os
 import shutil
 import signal
+import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -97,6 +113,18 @@ _DEFAULT_EVENTS = ("instructions:u",)
 # magnitude below anything worth catching, while a real per-operation shift
 # still lands far above the allowance.
 _COUNTER_TOLERANCE = 4
+#: The key a row uses to declare a WIDER inference allowance than the four
+#: above, beside the measurement that justifies it. Symmetric with the
+#: instruction side, which has taken a per-row band since it was written, and
+#: added for the same reason: a row whose noise was MEASURED wider than the
+#: default is a row the default reports forever. The C seat's boot is the case
+#: it was added for, whose count moves about twenty-five with nothing but
+#: whether the tree has been written over
+#: [source: extensions/cmetta/benchmarks/baseline.json,
+#: release_0_8_0_boot_environment_note]. A row that declares nothing keeps the
+#: four, and a declaration without a measurement beside it is a defect this
+#: file cannot catch: say what moved the row and by how much, or leave it.
+_COUNTER_ALLOWANCE_KEY = "inference_allowance"
 # The band an instruction row gets when it declares none. It is a DEFAULT and
 # never a policy the measurement path imposes: a row whose layout noise was
 # measured wider declares its own percent beside the reason, and re-pinning
@@ -221,10 +249,14 @@ def _compare_counter(
     if isinstance(baseline, bool) or not isinstance(baseline, int):
         msg = f"{name} baseline has invalid inferences {baseline!r}"
         raise AssertionError(msg)  # noqa: TRY004  -- the harness is checking its own invariant, so AssertionError is the intended contract
-    if observed > baseline + _COUNTER_TOLERANCE:
+    allowance = expected.get(_COUNTER_ALLOWANCE_KEY, _COUNTER_TOLERANCE)
+    if not isinstance(allowance, int) or isinstance(allowance, bool) or allowance < 0:
+        msg = f"{name} baseline has invalid {_COUNTER_ALLOWANCE_KEY} {allowance!r}"
+        raise AssertionError(msg)
+    if observed > baseline + allowance:
         msg = (
             f"{name} inference regression: minimum of {sample_values!r} is "
-            f"{observed}, baseline {baseline} plus the {_COUNTER_TOLERANCE} "
+            f"{observed}, baseline {baseline} plus the {allowance} "
             f"inference allowance"
         )
         raise AssertionError(
@@ -246,11 +278,11 @@ def _compare_counter(
     #really improved has EVERY sample below the pin, so this still fails on
     #one and cannot be quieted by a noisy run.
     highest = max(sample_values) if sample_values else observed
-    if highest < baseline - _COUNTER_TOLERANCE:
+    if highest < baseline - allowance:
         msg = (
             f"{name} inference improvement left unpinned: every sample of "
             f"{sample_values!r} is under baseline {baseline} minus the "
-            f"{_COUNTER_TOLERANCE} inference allowance; re-pin with "
+            f"{allowance} inference allowance; re-pin with "
             f"--update-baseline and record the mechanism beside the pin"
         )
         raise AssertionError(
@@ -495,6 +527,25 @@ class BenchmarkBaseline:
     def cases(self) -> Mapping[str, Mapping[str, Any]]:  # noqa: D102  -- the enclosing type and implemented protocol supply this method contract
         return self._document["benchmarks"]
 
+    def pinned_checkout_path_length(self) -> int | None:
+        """How long the repository root was when this document's pins were taken.
+
+        None when the document does not say, which is every baseline that has
+        no counter sensitive to it. A seat whose numbers move with the path
+        records `measurement.checkout_path_length` and compares the live root
+        against it, so a pin taken at the repository root is not read from a
+        worktree as a regression
+        [source: extensions/cmetta/benchmarks/baseline.json,
+        measurement.checkout_path_length_note].
+        """
+        measurement = self._document.get("measurement")
+        if not isinstance(measurement, Mapping):
+            return None
+        length = measurement.get("checkout_path_length")
+        if isinstance(length, bool) or not isinstance(length, int):
+            return None
+        return length
+
     def observe_counter(
         self,
         name: str,
@@ -511,6 +562,9 @@ class BenchmarkBaseline:
 
         if self.update:
             previous = self._document["benchmarks"].get(name, {})
+            #`previous` first, so a declared inference_allowance and every
+            #other field a row carries SURVIVE a re-pin: re-pinning re-measures
+            #the count, it does not re-decide what the row's noise is.
             self._document["benchmarks"][name] = {
                 **previous,
                 "unit": unit,
@@ -836,6 +890,142 @@ def benchmark_counter_slope(
     )
 
 
+#: What the kernel will let an unprivileged process count. Read when perf
+#: answers nothing, so a refusal names the knob that decides it rather than
+#: sending the reader into this harness: 2 or less is needed, and a container
+#: needs `--security-opt seccomp=unconfined` before perf_event_open is
+#: permitted at all.
+PARANOID = Path("/proc/sys/kernel/perf_event_paranoid")
+
+#: The status a CONTROLLED workload exits with when perf never acknowledged a
+#: control command: no window ever opened, so the process measured nothing.
+#: 125 is the status this tree and its tools already read as "the wrapper
+#: failed rather than the command" -- timeout(1) uses it for a failure in
+#: itself, `git bisect run` reads it as "this run says nothing about the
+#: commit", and bounded.sh refuses with it when the process that started a
+#: command had already exited [source: coreutils timeout(1) EXIT STATUS;
+#: git-bisect(1), "run <cmd>"; bounded.sh, the arming-race refusal].
+PERF_CONTROL_REFUSED = 125
+
+
+class MeasurementRefusedError(RuntimeError):
+    """The box would not take this measurement, so it says nothing about the tree.
+
+    Raised where perf could not count -- another session holding the PMU, a
+    kernel that will not let this process count itself, a container whose
+    seccomp profile denies perf_event_open, a control window that never opened
+    because an acknowledgement never came -- and never where a workload
+    answered wrongly. A lane that catches this reports a SKIP by name, because
+    reading contention as a regression is reading the box as a code change.
+    """
+
+
+def _paranoid_reading() -> str:
+    """What perf_event_paranoid says right now, or why it could not be read."""
+    try:
+        return PARANOID.read_text(encoding="utf-8").strip()
+    except OSError:
+        return "unreadable"
+
+
+#: Above how many runnable processes per core a TIME-derived counter stops
+#: describing the tree.
+#:
+#: One per core is the point where every runnable process still has a core, so
+#: below it a task-clock reading prices the work and above it, it prices the
+#: queue. The figure is not invented for this constant: the C seat's baseline
+#: records its CPU pins as taken at loadavg 9 to 30 on a 32-core box, which is
+#: 0.28 to 0.94 of a core each, and records what happens further up -- at
+#: loadavg 30 a task-clock triple spread 38% to 64% while instructions:u over
+#: the same runs spread 0.00002% to 0.129%
+#: [source: extensions/cmetta/benchmarks/baseline.json, measurement_conditions].
+#:
+#: Normalised by core count on purpose. A raw loadavg means opposite things on
+#: a 32-core desk and a 2-core runner, and a ceiling that reads 30 as busy on
+#: one and idle on the other would refuse in the wrong place.
+LOAD_PER_CORE_CEILING = 1.0
+
+
+def load_per_core() -> float:
+    """The one-minute load average divided by the cores that can serve it."""
+    try:
+        return os.getloadavg()[0] / (os.cpu_count() or 1)
+    except OSError:
+        #A box that will not say is treated as quiet: refusing a measurement
+        #because a counter could not be READ would turn an unrelated platform
+        #into a red lane.
+        return 0.0
+
+
+def time_is_measurable() -> bool:
+    """Whether a task-clock reading on this box describes the tree."""
+    return load_per_core() <= LOAD_PER_CORE_CEILING
+
+
+def refusal_is_fatal() -> bool:
+    """Whether a box that would not measure should also fail the lane.
+
+    One definition, because three lanes draw this line and a lane that drew it
+    differently would pass in CI without measuring. It is the line check.sh
+    already draws for a prerequisite the repository cannot provide: a runner
+    that cannot measure is a broken runner, and a lane that passes without
+    measuring is worse than a red one, while a developer's box is shared and a
+    contended PMU is not a code change
+    [source: tests/checks/check_upstream_parity.py, upstream_prerequisite].
+    """
+    return os.environ.get("CI") == "true"
+
+
+def measured_main(entry: Callable[[], int]) -> int:
+    """Run a benchmark lane and turn a refused measurement into a named skip.
+
+    Every benchmark entry point in this tree goes through here rather than
+    catching for itself, so no two lanes can drift into disagreeing about when
+    a box that would not count is allowed to pass. The policy is the line
+    check.sh already draws for a prerequisite the repository cannot provide:
+    refuse where CI=true, because a runner that cannot count is a broken runner
+    and a lane that passes without measuring is worse than a red one; print a
+    named skip elsewhere, because a developer's box is shared and a PMU another
+    session holds is not a code change
+    [source: tests/checks/check_upstream_parity.py, upstream_prerequisite].
+
+    The local skip exits PERF_CONTROL_REFUSED rather than 0, so check.sh's
+    summary says `skipped` for it instead of `ok`. Exit 0 made the two
+    indistinguishable in the one line a reader scans, and the difference is the
+    whole point: one of them compared every row.
+    """
+    try:
+        return entry()
+    except MeasurementRefusedError as refusal:
+        #The verdict goes on its own line and the diagnosis under it, because
+        #the diagnosis carries perf's transcript and a reader scanning a gate
+        #log has to see which of the two words this lane said without reading
+        #the rest.
+        if refusal_is_fatal():
+            print(
+                "error: this benchmark lane measured nothing and will not pass "
+                "on that; a CI runner that cannot count is a broken runner.",
+                file=sys.stderr,
+            )
+            print(f"  {refusal}", file=sys.stderr)
+            return 1
+        print(
+            "note: the box refused the measurement, so nothing here says the "
+            "tree moved; re-run it where the PMU is free."
+        )
+        print(f"  {refusal}")
+        #Not 0. A lane that measured nothing and exits 0 reads `ok` in
+        #check.sh's summary, indistinguishable from one that compared every row
+        #and passed, and that is not a small difference: mork-bench reported
+        #`ok` on four of five full gate runs while another session held the PMU
+        #and it compared not one row. 125 is the number this tree already
+        #spells "this run says nothing", and check.sh renders it `skipped`
+        #without failing the run
+        #[tested: test_a_benchmark_lane_skips_a_refusal_locally_and_refuses_it_in_ci;
+        #commit=0e33a6c1666b3d28c546c252ecaa8eeb87bee759].
+        return PERF_CONTROL_REFUSED
+
+
 def _counter_request(
     command: Sequence[str],
     events: Sequence[str],
@@ -863,6 +1053,15 @@ def _counter_request(
 def _parse_counter_sample(
     returncode: int, stdout: str, stderr: str, events: Sequence[str]
 ) -> dict[str, float]:
+    if returncode == PERF_CONTROL_REFUSED:
+        detail = " ".join((stderr.strip() or stdout.strip()).split())
+        msg = (
+            "the measured window never opened: perf did not acknowledge a "
+            "control command, which is what it does when its counter failed to "
+            f"arm while another session held the PMU. {PARANOID} reads "
+            f"{_paranoid_reading()}. perf and the workload said: {detail[-300:]}"
+        )
+        raise MeasurementRefusedError(msg)
     if returncode != 0:
         detail = stderr.strip() or stdout.strip()
         msg = f"perf stat failed with exit {returncode}: {detail}"
@@ -888,8 +1087,19 @@ def _parse_counter_sample(
             #a zero that would gate nothing.
             sample[event] = int(values[0]) if values[0].isdigit() else float(values[0])
         except ValueError as error:
-            msg = f"perf stat did not return a numeric {event} counter: {stderr.strip()}"
-            raise RuntimeError(msg) from error
+            #`<not counted>` and `<not supported>` are perf's own words for a
+            #counter that never armed, so this is the box refusing rather than
+            #the workload answering: nothing was measured and nothing here can
+            #say the tree moved.
+            msg = (
+                f"perf answered {values[0]!r} for {event} rather than a count, "
+                f"so its counter never armed. {PARANOID} reads "
+                f"{_paranoid_reading()}, where 2 or less is needed, and a "
+                "container needs --security-opt seccomp=unconfined before "
+                f"perf_event_open is permitted at all. perf said: "
+                f"{' '.join(stderr.split())[-300:]}"
+            )
+            raise MeasurementRefusedError(msg) from error
     return sample
 
 
@@ -1080,12 +1290,19 @@ def _run_perf(
 __all__ = [
     "CPU_SECONDS",
     "INSTRUCTIONS",
+    "LOAD_PER_CORE_CEILING",
+    "PERF_CONTROL_REFUSED",
     "BenchmarkBaseline",
     "CounterRuns",
+    "MeasurementRefusedError",
     "Metric",
     "benchmark_case",
     "benchmark_counter_slope",
     "count_atoms",
+    "load_per_core",
     "measure_counters",
     "measure_instructions",
+    "measured_main",
+    "refusal_is_fatal",
+    "time_is_measurable",
 ]

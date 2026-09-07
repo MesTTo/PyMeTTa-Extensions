@@ -217,8 +217,21 @@ _CONSTRUCTOR_ARITIES: Final[dict[str, tuple[int, ...]]] = {
     "arange-t": (1,),
     "eye": (1,),
 }
-_SPACE_STORES: dict[tuple[str, str], tuple[str, str]] = {}
 _STORE_SERIAL = itertools.count(1)
+
+#: Where a store's two public names route, as one row per store:
+#: ``(embedding-store <space> <name> (routes <knn> <embed>))`` in ``&metta``,
+#: beside the install roster above and for the same stated reason. The record
+#: was a module-global dict keyed by ``(space name, store name)`` until
+#: 2026-09-07, and anonymous space names are POOLED, so an entry outlived the
+#: space it was written for and a later space that took the recycled name read
+#: a closed store's routes. Only the ctxk case in the suite ever removed its
+#: entry; every other store left one standing for the life of the process
+#: [source: docs/journal/2026-09-07-the-array-roster-lives-in-the-space.md,
+#: which states the same constraint for the roster].
+_STORE_HEAD: Final[str] = "embedding-store"
+_STORE_PAYLOAD: Final[str] = "routes"
+_STORE_KIND_LOCK = threading.Lock()
 
 _BROADCAST_SHAPE_SOURCE: Final[str] = r"""
 :- use_module(library(clpfd)).
@@ -671,6 +684,65 @@ def _clear_installation(m: Any, incoming: str | None = None) -> list[str]:
             for arity in arities:
                 m.remove(_alias_equation(name, library, arity))
     return [name for _, names in previous for name in names]
+
+
+def _store_pattern(m: Any, name: str) -> Expression:
+    """The row one store of this name occupies in this space."""
+    return _expr(S[_STORE_HEAD], S[str(m.name)], S[name], V.routes)
+
+
+def _declare_store_kind(catalog: Space) -> None:
+    """Declare the store row's shape and its space ownership, once per catalog.
+
+    The same pair the roster declares, for the same two reasons: the kind row
+    has the engine refuse a malformed row at the write, and
+    ``(owned-by-space embedding-store)`` puts the head in the retirement walk
+    a dropped space already makes, so the record cannot outlive the space
+    [source: engine/spaces/catalog.pl, metta_retire_space_catalog/1].
+    """
+    declarations = (
+        _expr(S.kind, S[_STORE_HEAD], S.symbol, S.symbol, S.term),
+        _expr(S["owned-by-space"], S[_STORE_HEAD]),
+    )
+    with _STORE_KIND_LOCK:
+        for declaration in declarations:
+            if declaration not in catalog:
+                catalog.add(declaration)
+
+
+def _store_routes(m: Any, name: str) -> tuple[str, str] | None:
+    """The internal operations a standing store of this name routes to."""
+    for row in _catalog(m).match(_store_pattern(m, name)):
+        payload = row.routes
+        if (
+            isinstance(payload, Expression)
+            and payload.head == S[_STORE_PAYLOAD]
+            and len(payload.args) == 2
+        ):
+            return (str(payload.args[0]), str(payload.args[1]))
+    return None
+
+
+def _record_store(m: Any, name: str, knn: str, embed: str) -> None:
+    """Write the one row saying where this store's public names route.
+
+    Replacing rather than adding, because a second store of the same name in
+    the same space retargets the same two public names; `del` on a pattern
+    nothing matches raises, the way `del d[k]` does, so the guard is the
+    same one _clear_installation makes.
+    """
+    catalog = _catalog(m)
+    _declare_store_kind(catalog)
+    if _store_routes(m, name) is not None:
+        del catalog[_store_pattern(m, name)]
+    catalog.add(
+        _expr(
+            S[_STORE_HEAD],
+            S[str(m.name)],
+            S[name],
+            _expr(S[_STORE_PAYLOAD], S[knn], S[embed]),
+        )
+    )
 
 
 def _declare_roster_kind(catalog: Space) -> None:
@@ -1314,8 +1386,7 @@ class EmbeddingStore:
             declarations=[_expr(S.arguments, S[internal_embed], S.atoms)],
         )
 
-        key = (m.name, name)
-        previous = _SPACE_STORES.get(key)
+        previous = _store_routes(m, name)
         if previous is not None:
             m.remove(_route_equation(f"{name}-knn", previous[0], 2))
             m.remove(_route_equation(f"{name}-embed", previous[1], 1))
@@ -1323,7 +1394,7 @@ class EmbeddingStore:
             _route_equation(f"{name}-knn", internal_knn, 2),
             _route_equation(f"{name}-embed", internal_embed, 1),
         )
-        _SPACE_STORES[key] = (internal_knn, internal_embed)
+        _record_store(m, name, internal_knn, internal_embed)
 
     def add(self, key: Any, vector: Any) -> None:  # noqa: D102  -- the enclosing type and implemented protocol supply this method contract
         atom = key if isinstance(key, Atom) else S[str(key)]
