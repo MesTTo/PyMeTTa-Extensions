@@ -1,0 +1,40 @@
+# Purpose: package metta-pydantic, one distribution for one library.
+# Assumes: pymetta of the same version is installed; this is a workspace member
+#   released with it and pinned to it exactly.
+# Guarantees: importing metta_pydantic registers this package's rows, and so does the
+#   `metta.extensions` entry point below when a dispatch discovers it.
+# Decides: the dependency set is this library and nothing else, which is what
+#   makes "the core names no library" hold without an allowlist.
+[build-system]
+requires = ["setuptools>=83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metta-pydantic"
+version = "0.8.0"
+description = "A pydantic model as a MeTTa constructor expression"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    #: pymetta of exactly this version. A member is released with the core and
+    #: reads its seam, so a floating pin would let a row meet a seam that no
+    #: longer declares its point.
+    "pymetta==0.8.0",
+    "pydantic>=2",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+]
+
+#: How a seat that never heard of this package finds it: one entry in the
+#: group `metta.seam` reads, loaded at the first dispatch that has no answer
+#: without it. The target is the MODULE, whose body registers on import, which
+#: is the same door `import metta_pydantic` opens.
+[project.entry-points."metta.extensions"]
+metta-pydantic = "metta_pydantic"
+
+[tool.setuptools]
+py-modules = ["metta_pydantic"]

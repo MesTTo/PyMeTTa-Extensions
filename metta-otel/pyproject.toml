@@ -1,0 +1,46 @@
+# Purpose: package metta-otel, one distribution for one library.
+# Assumes: pymetta of the same version is installed; this is a workspace member
+#   released with it and pinned to it exactly.
+# Guarantees: importing metta_otel registers this package's rows, and so does the
+#   `metta.extensions` entry point below when a dispatch discovers it.
+# Decides: the dependency set is this library and nothing else, which is what
+#   makes "the core names no library" hold without an allowlist.
+[build-system]
+requires = ["setuptools>=83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metta-otel"
+version = "0.8.0"
+description = "A MeTTa reduction trace as OpenTelemetry spans, and its counters as metrics"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    #: pymetta of exactly this version. A member is released with the core and
+    #: reads its seam, so a floating pin would let a row meet a seam that no
+    #: longer declares its point.
+    "pymetta==0.8.0",
+    "opentelemetry-api>=1.30",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+]
+
+#: The SDK, for this package's own tests alone. What they assert about a span
+#: is what an EXPORTER received, and an in-memory exporter is the SDK's; the
+#: package itself imports the API and nothing else, which is the split the two
+#: OpenTelemetry distributions exist for.
+[project.optional-dependencies]
+test = [
+    "opentelemetry-sdk>=1.30",
+]
+
+#: No `metta.extensions` entry point: this package registers no row at all. It
+#: CALLS the seam's `observe` service, and a caller reaches it by importing
+#: `metta_otel` and asking for spans. Advertising would make every program pay
+#: to load it on its first dispatch and hand nothing back.
+[tool.setuptools]
+py-modules = ["metta_otel"]

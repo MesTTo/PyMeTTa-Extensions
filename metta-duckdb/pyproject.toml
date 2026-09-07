@@ -1,0 +1,40 @@
+# Purpose: package metta-duckdb, one distribution for one library.
+# Assumes: pymetta of the same version is installed; this is a workspace member
+#   released with it and pinned to it exactly.
+# Guarantees: importing metta_duckdb registers this package's rows, and so does the
+#   `metta.extensions` entry point below when a dispatch discovers it.
+# Decides: the dependency set is this library and nothing else, which is what
+#   makes "the core names no library" hold without an allowlist.
+[build-system]
+requires = ["setuptools>=83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metta-duckdb"
+version = "0.8.0"
+description = "DuckDB as a SQL engine a MeTTa head can be registered into"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    #: pymetta of exactly this version. A member is released with the core and
+    #: reads its seam, so a floating pin would let a row meet a seam that no
+    #: longer declares its point.
+    "pymetta==0.8.0",
+    "duckdb",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+]
+
+#: How a seat that never heard of this package finds it: one entry in the
+#: group `metta.seam` reads, loaded at the first dispatch that has no answer
+#: without it. The target is the MODULE, whose body registers on import, which
+#: is the same door `import metta_duckdb` opens.
+[project.entry-points."metta.extensions"]
+metta-duckdb = "metta_duckdb"
+
+[tool.setuptools]
+py-modules = ["metta_duckdb"]

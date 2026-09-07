@@ -1,0 +1,48 @@
+# Purpose: package metta-numpy, one distribution for one library.
+# Assumes: pymetta of the same version is installed; this is a workspace member
+#   released with it and pinned to it exactly.
+# Guarantees: importing metta_numpy registers this package's rows, and so does the
+#   `metta.extensions` entry point below when a dispatch discovers it.
+# Decides: the dependency set is this library and nothing else, which is what
+#   makes "the core names no library" hold without an allowlist.
+[build-system]
+requires = ["setuptools>=83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metta-numpy"
+version = "0.8.0"
+description = "NumPy as the default array library of the MeTTa Python seat"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    #: pymetta of exactly this version. A member is released with the core and
+    #: reads its seam, so a floating pin would let a row meet a seam that no
+    #: longer declares its point.
+    "pymetta==0.8.0",
+    "numpy",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+]
+
+#: The property-testing framework the `scalars` field answers a strategy in.
+#: Optional because the row's other three fields need nothing: a program that
+#: never asks this library to GENERATE values pays for none of it.
+[project.optional-dependencies]
+test = [
+    "hypothesis>=6.165",
+]
+
+#: How a seat that never heard of this package finds it: one entry in the
+#: group `metta.seam` reads, loaded at the first dispatch that has no answer
+#: without it. The target is the MODULE, whose body registers on import, which
+#: is the same door `import metta_numpy` opens.
+[project.entry-points."metta.extensions"]
+metta-numpy = "metta_numpy"
+
+[tool.setuptools]
+py-modules = ["metta_numpy"]

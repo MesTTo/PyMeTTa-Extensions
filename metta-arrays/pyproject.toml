@@ -1,0 +1,43 @@
+# Purpose: package metta-arrays, one distribution for one library.
+# Assumes: pymetta of the same version is installed; this is a workspace member
+#   released with it and pinned to it exactly.
+# Guarantees: importing metta_arrays registers this package's rows, and so does the
+#   `metta.extensions` entry point below when a dispatch discovers it.
+# Decides: the dependency set is this library and nothing else, which is what
+#   makes "the core names no library" hold without an allowlist.
+[build-system]
+requires = ["setuptools>=83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metta-arrays"
+version = "0.8.0"
+description = "Arrays as atoms for every library speaking DLPack and the Python array API"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    #: pymetta of exactly this version. A member is released with the core and
+    #: reads its seam, so a floating pin would let a row meet a seam that no
+    #: longer declares its point.
+    "pymetta==0.8.0",
+    "array-api-compat",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+]
+
+#: This package advertises NO `metta.extensions` entry point, and that is a
+#: measurement rather than an omission. Discovery loads every advertised
+#: package on the first dispatch of any point a registrant writes, so an
+#: expensive module body is a cost every program pays; importing this one
+#: costs 64 ms and 179 modules because it IS the array layer, where a row
+#: package costs 5 ms and 33 [measured 2026-09-08, extensions/python:
+#: `python -c "import metta; import metta_arrays"` against `metta_pandas`].
+#: Nothing loses anything: the one row here is this package's own index
+#: fallback, and the only door that reads the `index` point is the embedding
+#: store in this module, so a program that can use the row has imported it.
+[tool.setuptools]
+py-modules = ["metta_arrays"]
