@@ -92,7 +92,7 @@ Guarded by:
     nearest-neighbour backend wins `backend="auto"` whatever order the two
     distributions loaded in [tested:
     ext/metta-faiss/tests/test_faiss.py::test_faiss_wins_auto_over_the_array_api_fallback;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

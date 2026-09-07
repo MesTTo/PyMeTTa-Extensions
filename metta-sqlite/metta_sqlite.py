@@ -15,10 +15,10 @@ Assumes:
     registers here where DuckDB refuses one
 Guarantees:
   - a head with no declared arrow still registers, taking its argument count
-    from the signature [tested: tests/test_sqlite.py; commit=WORKTREE]
+    from the signature [tested: tests/test_sqlite.py; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
   - a connection of any other engine is declined, so the next row is consulted
     [tested: tests/test_sqlite.py::test_a_foreign_connection_is_declined;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

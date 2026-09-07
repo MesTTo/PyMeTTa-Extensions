@@ -19,15 +19,15 @@ Guarantees:
   - a model projects as `(Model field ...)` and rebuilds through
     `model_validate(..., by_name=True)`, so a field declared with an alias
     validates from the attribute names the projection read
-    [tested: tests/test_pydantic.py; commit=WORKTREE]
+    [tested: tests/test_pydantic.py; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
   - a model carrying pydantic EXTRA fields is refused naming them, rather than
     projected with them silently dropped [tested:
     tests/test_pydantic.py::test_extra_fields_refuse_rather_than_vanish;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
   - this row is asked before the structural fallbacks whatever order the two
     registered in [tested:
     tests/test_pydantic.py::test_a_model_is_not_read_as_a_match_args_class;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

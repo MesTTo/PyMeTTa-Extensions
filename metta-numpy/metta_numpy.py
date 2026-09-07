@@ -16,11 +16,11 @@ Assumes:
 Guarantees:
   - the row makes NumPy the default with no default= given, and taking it away
     leaves the array doors refusing by name rather than reaching NumPy anyway
-    [tested: tests/test_numpy.py; commit=WORKTREE]
+    [tested: tests/test_numpy.py; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
   - the scalars strategy generates values MeTTa accepts as Number operands
     while they keep their NumPy identity [tested:
     tests/test_numpy.py::test_the_scalars_row_generates_numpy_scalars;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

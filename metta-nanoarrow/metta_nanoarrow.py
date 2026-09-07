@@ -16,12 +16,12 @@ Assumes:
 Guarantees:
   - fields are built one at a time rather than from a name-to-type mapping, so
     a bridge declaration naming one table column twice keeps both, which a
-    dict would silently drop [tested: tests/test_nanoarrow.py; commit=WORKTREE]
+    dict would silently drop [tested: tests/test_nanoarrow.py; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
   - a requested schema this producer cannot satisfy exactly is IGNORED rather
     than refused, which is the interface's own best-effort rule
     [source: https://arrow.apache.org/docs/format/CDataInterface/PyCapsuleInterface.html;
     tested: tests/test_nanoarrow.py::test_an_unsatisfiable_request_is_ignored;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

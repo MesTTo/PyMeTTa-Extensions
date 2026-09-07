@@ -18,11 +18,11 @@ Guarantees:
     -- because a response body is what `pyarrow.ipc.open_stream` is handed and
     a fragment is not readable on its own
     [source: https://arrow.apache.org/docs/format/Columnar.html#ipc-streaming-format;
-    tested: tests/test_pyarrow.py; commit=WORKTREE]
+    tested: tests/test_pyarrow.py; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
   - every field carries its MeTTa type in `metta.type` metadata, and a column
     that is text because nothing declared it also carries `metta.kind=mixed`
     [tested: tests/test_pyarrow.py::test_a_field_carries_its_metta_type;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

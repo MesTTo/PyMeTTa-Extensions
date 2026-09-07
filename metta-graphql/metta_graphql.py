@@ -19,12 +19,12 @@ Guarantees:
     renames it `coerce_output_value` and keeps both on the class
     [source: https://github.com/graphql-python/graphql-core, GraphQLScalarType's
     constructor assigning serialize and parse_value as plain attributes;
-    tested: tests/test_graphql.py; commit=WORKTREE]
+    tested: tests/test_graphql.py; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
   - a request with no `query` field, and one whose `variables` is not an
     object, are refused by name rather than executed
     [source: https://graphql.github.io/graphql-over-http/draft/, the POST
     request body; tested: tests/test_graphql.py::test_a_malformed_request_is_refused;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

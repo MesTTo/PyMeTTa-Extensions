@@ -18,10 +18,10 @@ Assumes:
 Guarantees:
   - a frame built from a pandas 3 install is typed BY the projection through
     DataFrame.from_arrow, and falls back to the projected columns below that
-    or without an Arrow builder [tested: tests/test_pandas.py; commit=WORKTREE]
+    or without an Arrow builder [tested: tests/test_pandas.py; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
   - the accessor installs on a pandas already imported and imports nothing to
     find out [tested: tests/test_pandas.py::test_the_accessor_installs_for_an_imported_pandas;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

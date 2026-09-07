@@ -11,10 +11,10 @@ Guarantees:
   - a head with no declared arrow is refused with the arrow it needs, rather
     than registered with types inferred from what the stored atoms happen to
     justify [tested: tests/test_duckdb.py::test_an_undeclared_head_is_refused_with_its_arrow;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
   - a head that answers nothing gives SQL NULL rather than an error, which is
     what null_handling="special" buys [tested: tests/test_duckdb.py;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

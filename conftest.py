@@ -9,7 +9,7 @@ Assumes: a `metta` importable from the seat's own directory, which the runner's
   `pythonpath` setting provides.
 Guarantees:
   - a member's test asks for `metta` or `scratch_space` and gets the shipped
-    fixture [tested: ext/metta-numpy/tests/test_numpy.py; commit=WORKTREE]
+    fixture [tested: ext/metta-numpy/tests/test_numpy.py; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

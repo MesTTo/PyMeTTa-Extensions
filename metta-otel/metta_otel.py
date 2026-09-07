@@ -46,7 +46,7 @@ Guarantees:
     `observe` service, so a trace or debug session inside it refuses and so
     does an observe inside one of those
     [tested: test_a_trace_inside_an_observed_block_refuses,
-    test_observing_inside_a_debug_session_refuses; commit=WORKTREE]
+    test_observing_inside_a_debug_session_refuses; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
   - the recording bound stops the RECORDING and never the observed work, because
     the work is the caller's and a telemetry budget must not become its error
     [tested: test_a_recording_bound_stops_the_recording_not_the_work; commit=0fb68d75871c57f2421c335e9faef3561f8dfdd5]
@@ -54,7 +54,7 @@ Owns resources:
   - observe() owns the engine's trace session for the block through the seam's
     `observe` service, which releases it in a finally, so a raising block
     leaves the wrappers off
-    [tested: test_a_raising_block_still_releases_the_session; commit=WORKTREE]
+    [tested: test_a_raising_block_still_releases_the_session; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Fails when:
   - a caller wants spans to arrive WHILE the block runs. The engine's tracer
     records into its own store and is read at the end -- "Nothing here streams

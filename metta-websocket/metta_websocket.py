@@ -17,7 +17,7 @@ Assumes:
 Guarantees:
   - a websocket timeout and a closed stream both read as transport failures,
     and an ordinary application error does not [tested: tests/test_websocket.py;
-    commit=WORKTREE]
+    commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None

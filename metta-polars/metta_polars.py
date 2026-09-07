@@ -16,7 +16,7 @@ Guarantees:
   - a frame is built through the Arrow view where one exists, which is what
     reaches polars' capsule path: its constructor tests for a sequence before
     it looks for the capsule, and the view is the same data with nothing else
-    on it [tested: tests/test_polars.py; commit=WORKTREE]
+    on it [tested: tests/test_polars.py; commit=94057a0f073c0fab0a35c42beff2c324d8a0addd]
 Open Obligations:
   To Do: None
   Hacks: None
