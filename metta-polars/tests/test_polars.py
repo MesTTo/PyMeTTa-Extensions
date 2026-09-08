@@ -1,5 +1,9 @@
 """Purpose: prove the polars row builds a frame through the Arrow view.
 
+Guarantees: conversion sugar is declared by a door row beside its frame
+  provider [tested: test_the_row_is_registered_against_the_frame_point;
+  commit=WORKTREE].
+
 Blackbox: `rows.to_pl()`, `rows.to(polars)` and `frame.metta`. The Arrow path
 is the one that matters here, because polars' constructor tests for a sequence
 before it looks for the capsule and the view is what reaches the capsule.
@@ -27,11 +31,13 @@ def people():
 
 
 def test_the_row_is_registered_against_the_frame_point():
-    """One row, named for the library, carrying the sugar it asked for."""
+    """The frame provider and receiver sugar have separate declared roles."""
     row = seam.frame.find("polars")
     assert row is not None
     assert row.module == "polars"
-    assert row.sugar == "to_pl"
+    contract = next(door for door in seam.door.find("metta-polars").doors if door.key == "rows:to-pl")
+    assert contract.sugar_of.base == "rows:to"
+    assert contract.sugar_of.fixed == (("library", "polars"),)
 
 
 def test_to_pl_builds_a_polars_frame(people):

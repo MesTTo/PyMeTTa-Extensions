@@ -1,5 +1,9 @@
 """Purpose: prove the pandas row builds a frame and installs its accessor.
 
+Guarantees: conversion sugar is declared by a door row beside its frame
+  provider [tested: test_the_row_is_registered_against_the_frame_point;
+  commit=WORKTREE].
+
 Blackbox through the doors a user takes: `rows.to_df()`, `rows.to(pandas)` and
 `frame.metta`. Importing `metta_pandas` is one of the two sanctioned ways a
 package's rows arrive, and the one a checkout can take; the other, the
@@ -29,11 +33,13 @@ def people():
 
 
 def test_the_row_is_registered_against_the_frame_point():
-    """One row, named for the library, carrying the sugar it asked for."""
+    """The frame provider and receiver sugar have separate declared roles."""
     row = seam.frame.find("pandas")
     assert row is not None
     assert row.module == "pandas"
-    assert row.sugar == "to_df"
+    contract = next(door for door in seam.door.find("metta-pandas").doors if door.key == "rows:to-df")
+    assert contract.sugar_of.base == "rows:to"
+    assert contract.sugar_of.fixed == (("library", "pandas"),)
     assert not row.fallback
 
 

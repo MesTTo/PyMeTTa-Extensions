@@ -29,15 +29,10 @@ classifiers = [
     "Intended Audience :: Science/Research",
 ]
 
-#: This package advertises NO `metta.extensions` entry point, and that is a
-#: measurement rather than an omission. Discovery loads every advertised
-#: package on the first dispatch of any point a registrant writes, so an
-#: expensive module body is a cost every program pays; importing this one
-#: costs 64 ms and 179 modules because it IS the array layer, where a row
-#: package costs 5 ms and 33 [measured 2026-09-08, extensions/python:
-#: `python -c "import metta; import metta_arrays"` against `metta_pandas`].
-#: Nothing loses anything: the one row here is this package's own index
-#: fallback, and the only door that reads the `index` point is the embedding
-#: store in this module, so a program that can use the row has imported it.
+# Discovery imports the door records. The implementation loads when an
+# accessor is called, so registration does not load the array library.
+[project.entry-points."metta.extensions"]
+metta-arrays = "metta_arrays_doors"
+
 [tool.setuptools]
-py-modules = ["metta_arrays"]
+py-modules = ["metta_arrays", "metta_arrays_doors"]

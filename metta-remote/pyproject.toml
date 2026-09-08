@@ -1,0 +1,20 @@
+# Purpose: distribute the remote door registrations independently of the core.
+# Guarantees: discovery loads only metadata; each body imports when called.
+[build-system]
+requires = ["setuptools>=83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metta-remote"
+version = "0.8.0"
+description = "The remote accessor for MeTTa spaces"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = ["pymetta==0.8.0"]
+
+[project.entry-points."metta.extensions"]
+metta-remote = "metta_remote"
+
+[tool.setuptools]
+py-modules = ["metta_remote"]
