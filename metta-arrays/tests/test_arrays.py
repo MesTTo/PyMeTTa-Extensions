@@ -72,8 +72,8 @@ from metta import (
     MeTTa,
     S,
     V,
+    convert,
     ground,
-    wire,
 )
 from metta.errors import MettaError
 from metta.ops import registered
@@ -219,7 +219,7 @@ def test_annotated_tensor_shapes_flow_through_broadcast_and_matmul(am):
 
 def test_the_constructor_builds_numpy_here(am):  # noqa: D103  -- pytest discovers or injects this callable; its descriptive name states the contract
     (group,) = am.run("!(tensor (1.0 2.0))")
-    assert isinstance(wire.decode(group[0]), numpy.ndarray)
+    assert isinstance(convert.decode(group[0]), numpy.ndarray)
 
 
 def test_nested_backend_names_do_not_retarget_an_earlier_space():
@@ -237,9 +237,9 @@ def test_nested_backend_names_do_not_retarget_an_earlier_space():
         (second_answer,) = second.run("!(zeros 2 2)")
         (after_second,) = first.run("!(zeros 2 2)")
 
-        assert type(wire.decode(before_second[0])).__module__.startswith("jax")
-        assert isinstance(wire.decode(second_answer[0]), numpy.ndarray)
-        assert type(wire.decode(after_second[0])).__module__.startswith("jax")
+        assert type(convert.decode(before_second[0])).__module__.startswith("jax")
+        assert isinstance(convert.decode(second_answer[0]), numpy.ndarray)
+        assert type(convert.decode(after_second[0])).__module__.startswith("jax")
         assert "zeros--jax.numpy" in registered()
         assert "zeros--numpy" in registered()
         assert arrays.backend(first) == "jax.numpy"
@@ -300,7 +300,7 @@ def test_a_second_install_replaces_the_roster_and_its_operations():
         # process-wide registry with the roster that named them.
         assert "zeros--jax.numpy" not in registered()
         (answer,) = space.run("!(zeros 2 2)")
-        assert isinstance(wire.decode(answer[0]), numpy.ndarray)
+        assert isinstance(convert.decode(answer[0]), numpy.ndarray)
         # One alias equation per accepted arity, not two installs' worth.
         aliases = [
             atom for atom in space.atoms() if str(atom).startswith("(= (zeros ")
@@ -350,7 +350,7 @@ def test_uninstall_retires_the_installation_and_keeps_shared_operations():
         arrays.install(leaving, default=jax_numpy)
 
         (routed,) = leaving.run("!(zeros 2 2)")
-        assert type(wire.decode(routed[0])).__module__.startswith("jax")
+        assert type(convert.decode(routed[0])).__module__.startswith("jax")
 
         assert "zeros--jax.numpy" not in arrays.uninstall(leaving)
         assert "zeros--jax.numpy" in registered()
@@ -451,7 +451,7 @@ def test_ndarray_identity_through_space(am):  # noqa: D103  -- pytest discovers 
     array = numpy.arange(4.0)
     space = am._new_space()
     space.add(S.holds(ground(array)))
-    assert wire.decode(space.match(S.holds(V.a))[0].a) is array
+    assert convert.decode(space.match(S.holds(V.a))[0].a) is array
 
 
 def test_dltensor_is_a_protocol_type_the_engine_checks(am):  # noqa: D103  -- pytest discovers or injects this callable; its descriptive name states the contract

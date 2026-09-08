@@ -113,9 +113,10 @@ from typing import Annotated, Any, Final, Literal, NewType, cast
 from metta import Space, seam
 from metta import integrate as _integrate
 from metta import ops as _ops
+from metta import typing as _typing
 from metta.atoms import Atom, Expression, Grounded, S, Symbol, V, Variable, ground
+from metta.convert import decode as _decode
 from metta.errors import MettaError
-from metta.wire import decode as _decode
 
 #: Bound once, because these are per-call on the hot paths and a service lookup
 #: is two dictionary reads. `alpha-eq` is MeTTa's =alpha and `module` is the
@@ -153,10 +154,16 @@ __all__ = [
 _ROSTER_HEAD: Final[str] = "array-backend"
 _ROSTER_PAYLOAD: Final[str] = "ops"
 _CATALOG: Final[str] = "&metta"
-# Shape behavior for every logical head; backend constructor aliases use the
-# same entry. Only preserve, broadcast, and matmul derive unevaluated types.
-# Other rules describe the runtime transformation whose result is observed by
-# the grounded type protocol. A missing entry refuses registration.
+# Which shape rule every logical head follows; backend constructor aliases use
+# the same entry. This is the library's own DECLARATION of its heads, and
+# install() writes each pair into the space as a `(typing <space> <head> <kind>)`
+# row,
+# so what a program reads is the row rather than this table. The rule KINDS
+# themselves are rows on the seam's `typing` point (_RULE_KINDS below): the
+# equations `broadcast` and `matmul` carry are templates the point instantiates,
+# and every other kind describes a runtime transformation whose result the
+# grounded type protocol observes, so it carries none. A missing entry refuses
+# registration.
 SHAPE_RULES: Final[dict[str, str]] = {
     "tensor": "from-data",
     "zeros": "dimensions",
@@ -316,8 +323,13 @@ def _tensor_shape_equation() -> Expression:
     )
 
 
-def _broadcast_type_equation(name: str) -> Expression:
-    """Infer the shaped result of one elementwise binary operation."""
+def _broadcast_template() -> Expression:
+    """Infer the shaped result of one elementwise binary operation.
+
+    A TEMPLATE: `$head` is the hole the `typing` point fills with the head this
+    rule is declared for, so `(typing t+ broadcast)` and `(typing t* broadcast)`
+    instantiate the same rule rather than each calling a builder.
+    """
     left = Variable("__arrays_left")
     right = Variable("__arrays_right")
     left_shape = Variable("__arrays_left_shape")
@@ -325,7 +337,7 @@ def _broadcast_type_equation(name: str) -> Expression:
     out_shape = Variable("__arrays_out_shape")
     return _expr(
         S["="],
-        _expr(S["get-type"], _expr(S[name], left, right)),
+        _expr(S["get-type"], _expr(V.head, left, right)),
         _expr(
             S.let,
             left_shape,
@@ -345,8 +357,11 @@ def _broadcast_type_equation(name: str) -> Expression:
     )
 
 
-def _matmul_type_equation() -> Expression:
-    """Infer ``(rows, shared) x (shared, columns) -> (rows, columns)``."""
+def _matmul_template() -> Expression:
+    """Infer ``(rows, shared) x (shared, columns) -> (rows, columns)``.
+
+    A TEMPLATE, for the reason `_broadcast_template` gives.
+    """
     left = Variable("__arrays_left")
     right = Variable("__arrays_right")
     rows = Variable("__arrays_rows")
@@ -354,7 +369,7 @@ def _matmul_type_equation() -> Expression:
     columns = Variable("__arrays_columns")
     return _expr(
         S["="],
-        _expr(S["get-type"], _expr(S.matmul, left, right)),
+        _expr(S["get-type"], _expr(V.head, left, right)),
         _expr(
             S.let,
             _expr(rows, shared),
@@ -369,20 +384,57 @@ def _matmul_type_equation() -> Expression:
     )
 
 
-def _type_equations() -> tuple[Expression, ...]:
-    """Every get-type equation an install adds, derived from SHAPE_RULES.
+#: Every shape rule this library knows, as rows for the seam's `typing` point.
+#: Two carry equations; the other nineteen describe a runtime transformation
+#: whose result the grounded type protocol observes, and their row is what says
+#: so where a Python table said it in a comment. A rule kind is not about
+#: arrays: `preserve`, `broadcast`, `reduce-all` and `concatenate-axis` are the
+#: same algebra over any indexed carrier, which is why they are registrable
+#: rather than hard-wired here.
+_RULE_KINDS: Final[dict[str, str]] = {
+    "from-data": "the shape of the nested data the constructor was given",
+    "dimensions": "the dimensions the constructor was given, in order",
+    "range-length": "one axis, as long as the range",
+    "square": "two equal axes",
+    "matmul": "(rows, shared) x (shared, columns) -> (rows, columns)",
+    "broadcast": "the two operands' shapes, broadcast",
+    "preserve": "the operand's own shape, unchanged",
+    "reshape": "the shape the call names",
+    "swap-axes": "the operand's shape with two axes exchanged",
+    "insert-axis": "the operand's shape with a unit axis inserted",
+    "remove-unit-axis": "the operand's shape with a unit axis removed",
+    "index-leading-axis": "the operand's shape without its leading axis",
+    "concatenate-axis": "the operands' shape with one axis summed",
+    "stack-axis": "the operands' shape with a new axis of their count",
+    "reduce-all": "a scalar",
+    "reduce-axis": "the operand's shape without the reduced axis",
+    "scalar-observation": "the operand's single value, as a host number",
+    "nested-observation": "the operand's values, as nested host lists",
+    "shape-observation": "the operand's shape, as data",
+    "dtype-observation": "the operand's element type, as data",
+    "device-observation": "the operand's device, as data",
+}
 
-    install() adds each one as it registers the head it belongs to and
-    uninstall() withdraws the same set; both classify from SHAPE_RULES, so a
-    head that gains a shape rule cannot leave its equation behind.
+#: The equations each kind carries, keyed by kind. A kind absent here carries
+#: none, which is what `_RULE_KINDS`' prose says of nineteen of them.
+_RULE_EQUATIONS: Final[dict[str, tuple[Expression, ...]]] = {}
+
+
+def _register_rule_kinds() -> None:
+    """Put this library's shape rules on the seam, once per process.
+
+    The point holds the kinds and any library may add one; these are the
+    twenty-one this library brought. Registering the same name twice REPLACES
+    the row in place, which is the registry's ordinary replacement, so a second
+    call is a no-op rather than a duplicate.
     """
-    equations = [_tensor_shape_equation()]
-    for head, rule in SHAPE_RULES.items():
-        if rule == "broadcast":
-            equations.append(_broadcast_type_equation(head))
-        elif rule == "matmul":
-            equations.append(_matmul_type_equation())
-    return tuple(equations)
+    if not _RULE_EQUATIONS:
+        _RULE_EQUATIONS["broadcast"] = (_broadcast_template(),)
+        _RULE_EQUATIONS["matmul"] = (_matmul_template(),)
+    for kind, doc in _RULE_KINDS.items():
+        seam.typing.register(
+            kind, doc=doc, equations=_RULE_EQUATIONS.get(kind, ())
+        )
 
 
 def _top_indices(xp: Any, scores: Any, count: int) -> list[int]:
@@ -898,6 +950,10 @@ def install(m, default: Any = None) -> list[str]:  # noqa: C901  -- install keep
             m.run(str(equation))
 
     add_type_equation(_tensor_shape_equation())
+    # The shape rules this library brought, as rows on the seam's typing point.
+    # Registering them here rather than at import keeps a program that only
+    # imported the module from paying for a seam registration it never uses.
+    _register_rule_kinds()
 
     def op(
         fn,
@@ -935,10 +991,10 @@ def install(m, default: Any = None) -> list[str]:  # noqa: C901  -- install keep
             parameter = next(iter(inspect.signature(fn).parameters))
             fn.__annotations__[parameter] = tensor
             fn.__annotations__["return"] = tensor
-        elif rule == "broadcast":
-            add_type_equation(_broadcast_type_equation(name))
-        elif rule == "matmul":
-            add_type_equation(_matmul_type_equation())
+        # The head's own rule, as a `(typing <space> <head> <kind>)` row: the point
+        # instantiates whichever equations that kind carries and adds them, so
+        # nothing here decides which rules have equations.
+        _typing.declare(m, name, rule)
         m.op(fn, name=name, effect=effect, transport=transport, **kw)
         registered.append(name)
         return fn
@@ -1273,8 +1329,11 @@ def uninstall(m) -> list[str]:
             f"{rule_result!r}"
         )
         raise MettaError(msg)
-    for equation in _type_equations():
-        m.remove(equation)
+    m.remove(_tensor_shape_equation())
+    # Every head's declaration, retired through the point that made it, so the
+    # equations withdrawn are the ones the rule's own templates produced.
+    for head in SHAPE_RULES:
+        _typing.withdraw(m, head)
     for library, _ in standing:
         for name in _CONSTRUCTOR_ARITIES:
             for alias_type in _alias_types(name, library):

@@ -8,7 +8,7 @@ Open Obligations:
 import metta_numpy  # noqa: F401  -- imported for the array row it registers
 import pytest
 
-from metta import Grounded, wire
+from metta import Grounded, convert
 from metta import testing as pt
 
 pytest.importorskip("numpy")
@@ -25,5 +25,5 @@ def test_numpy_scalar_strategy_round_trips_through_the_engine(metta, scalar):  #
         "metta_py_decode_shared(W, _T, _), metta_py_encode(_T, W2)",
         W=atom.to_wire(),
     )
-    restored = wire.from_wire(row["W2"])
+    restored = convert.from_wire(row["W2"])
     assert restored.value is scalar
