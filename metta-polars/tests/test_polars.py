@@ -2,7 +2,7 @@
 
 Guarantees: conversion sugar is declared by a door row beside its frame
   provider [tested: test_the_row_is_registered_against_the_frame_point;
-  commit=WORKTREE].
+  commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543].
 
 Blackbox: `rows.to_pl()`, `rows.to(polars)` and `frame.metta`. The Arrow path
 is the one that matters here, because polars' constructor tests for a sequence

@@ -1,7 +1,7 @@
 """Purpose: exercise the frame namespace and both declared receiver sugars.
 
 Guarantees: the three doors preserve columns and duplicate rows
-  [tested: test_pandas_namespace_and_short_sugars_share_the_row; commit=WORKTREE].
+  [tested: test_pandas_namespace_and_short_sugars_share_the_row; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543].
 Owns resources: the Answers context closes its source and the engine context.
 """
 

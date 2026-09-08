@@ -1,7 +1,7 @@
 """Purpose: verify deferred remote doors reach the existing transport and server.
 
 Guarantees: a namespace-served socket accepts a namespace-connected client
-  [tested: test_remote_namespace_preserves_transport_and_server_lifetimes; commit=WORKTREE].
+  [tested: test_remote_namespace_preserves_transport_and_server_lifetimes; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543].
 Owns resources: the server context closes its socket, worker, and answer cursors.
 """
 

@@ -1,7 +1,7 @@
 """Purpose: verify each registered tables namespace door at its public boundary.
 
 Guarantees: ingestion, declarations, accessors, and SQL calls reach their bodies
-  [tested: test_table_namespace_preserves_ingestion_and_conversions; commit=WORKTREE].
+  [tested: test_table_namespace_preserves_ingestion_and_conversions; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543].
 Owns resources: the test closes its database connection and engine context.
 """
 

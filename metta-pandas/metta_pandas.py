@@ -18,13 +18,13 @@ Guarantees:
   - namespace and short conversion methods come from door contracts; the
     frame row owns the builder and library accessor [tested:
     tests/test_pandas.py::test_the_row_is_registered_against_the_frame_point,
-    tests/test_pandas_doors.py; commit=WORKTREE]
+    tests/test_pandas_doors.py; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543]
   - a frame built from a pandas 3 install is typed BY the projection through
     DataFrame.from_arrow, and falls back to the projected columns below that
-    or without an Arrow builder [tested: tests/test_pandas.py; commit=WORKTREE]
+    or without an Arrow builder [tested: tests/test_pandas.py; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543]
   - the accessor installs on a pandas already imported and imports nothing to
     find out [tested: tests/test_pandas.py::test_the_accessor_installs_for_an_imported_pandas;
-    commit=WORKTREE]
+    commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543]
 Open Obligations:
   To Do: None
   Hacks: None

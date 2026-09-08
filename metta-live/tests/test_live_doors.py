@@ -1,7 +1,7 @@
 """Purpose: verify the registered live namespace owns and releases its views.
 
 Guarantees: both accessor spellings preserve committed multiplicities
-  [tested: test_live_namespace_preserves_view_lifecycle; commit=WORKTREE].
+  [tested: test_live_namespace_preserves_view_lifecycle; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543].
 Owns resources: the context managers close both Live subscriptions and Space.
 """
 

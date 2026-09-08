@@ -1,10 +1,10 @@
 """Purpose: register the live-query accessor without loading its implementation.
 
 Guarantees: the live accessor uses the existing query maintenance and lifetime
-  protocol [tested: test_live_namespace_preserves_view_lifecycle; commit=WORKTREE].
+  protocol [tested: test_live_namespace_preserves_view_lifecycle; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543].
 Owns resources: registration holds immutable metadata only. A returned Live
   owns its subscriptions until close or abandonment [tested:
-  test_live_namespace_preserves_view_lifecycle; commit=WORKTREE].
+  test_live_namespace_preserves_view_lifecycle; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543].
 """
 
 from __future__ import annotations

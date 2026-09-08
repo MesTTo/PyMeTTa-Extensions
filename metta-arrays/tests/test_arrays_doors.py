@@ -1,7 +1,7 @@
 """Purpose: verify deferred array namespace installation and its inverse.
 
 Guarantees: each accessor reads or retires the installation owned by its receiver
-  [tested: test_array_namespace_preserves_installation_and_withdrawal; commit=WORKTREE].
+  [tested: test_array_namespace_preserves_installation_and_withdrawal; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543].
 Owns resources: uninstall releases process-global operations before Space closes.
 """
 

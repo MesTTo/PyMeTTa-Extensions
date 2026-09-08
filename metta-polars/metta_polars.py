@@ -16,7 +16,7 @@ Guarantees:
   - namespace and short conversion methods come from door contracts; the
     frame row owns the builder and library accessor [tested:
     tests/test_polars.py::test_the_row_is_registered_against_the_frame_point,
-    tests/test_polars_doors.py; commit=WORKTREE]
+    tests/test_polars_doors.py; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543]
   - a frame is built through the Arrow view where one exists, which is what
     reaches polars' capsule path: its constructor tests for a sequence before
     it looks for the capsule, and the view is the same data with nothing else

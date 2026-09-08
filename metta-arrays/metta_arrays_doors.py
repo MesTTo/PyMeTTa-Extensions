@@ -1,7 +1,7 @@
 """Purpose: register the arrays accessor using deferred implementation references.
 
 Guarantees: registration imports no implementation and accessor calls preserve
-  its behavior [tested: test_array_namespace_preserves_installation_and_withdrawal; commit=WORKTREE].
+  its behavior [tested: test_array_namespace_preserves_installation_and_withdrawal; commit=b615b5a33b43252ef9826e5387da7c9bd7f6b543].
 """
 
 from __future__ import annotations
