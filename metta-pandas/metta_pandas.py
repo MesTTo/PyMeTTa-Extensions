@@ -13,7 +13,7 @@ Pygments' shape for a plugin lexer and Airflow's for a provider.
 
 Assumes:
   - pandas is importable when a frame is actually BUILT; the row itself holds
-    the module NAME and imports nothing, so `import metta.results` stays free
+    the module NAME and imports nothing, so `import metta._spaces.results` stays free
 Guarantees:
   - namespace and short conversion methods come from door contracts; the
     frame row owns the builder and library accessor [tested:
@@ -33,23 +33,13 @@ Open Obligations:
 
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
+import metta.doors as _doors
 from metta import seam
-from metta.doors import (
-    AnswersAs,
-    Body,
-    Door,
-    Kind,
-    Owner,
-    Provider,
-    Receiver,
-    Signature,
-    State,
-    Sugar,
-    Tier,
-)
-from metta.vocabularies import Determinism, EffectClass
+
+if TYPE_CHECKING:
+    from metta import Answers, Rows
 
 _MISSING: Final = (
     "to_df() builds a pandas DataFrame and pandas is not installed; "
@@ -83,49 +73,62 @@ def _build(source: Any, projection: Any, view: Any) -> Any:
 
 
 
+@_doors.door(
+    kind=_doors.Kind.query,
+    answers=_doors.AnswersAs.value,
+    effect=_doors.EffectClass.oracleIO,
+    determinism=_doors.Determinism.det,
+    state=_doors.State.any,
+    tiers=(_doors.Tier.sync, _doors.Tier.context),
+    provider=_doors.Provider('metta-pandas', 'tables'),
+    evidence=('extensions/python/ext/metta-pandas/tests/test_pandas_doors.py::test_pandas_namespace_and_short_sugars_share_the_row',),
+    sugar_of=_doors.Sugar('rows:to', (('library', 'pandas'),)),
+)
 def to_df(rows: Any) -> Any:
     """These rows as a pandas DataFrame; the declared point rows.to('pandas')."""
     return rows.to('pandas')
 
 
-# closed-set: decides; policy=this frame library declares its accessor and short receiver sugars; reads=Rows.to and Answers.to
-DOORS: tuple[Door, ...] = (
-    Door(
-        owner=Owner.namespace, name='to-df', kind=Kind.query,
-        signatures=(Signature("rows: Any", returns="Any"),), answers=AnswersAs.value,
-        effect=EffectClass.oracleIO, determinism=Determinism.det, state=State.any,
-        tiers=(Tier.sync, Tier.context), body=Body('metta_pandas', 'to_df', Receiver.none),
-        provider=Provider('metta-pandas', "tables"),
-        docs="These rows as a pandas DataFrame; the declared point rows.to('pandas').",
+
+
+class _RowsSugar:
+    @staticmethod
+    @_doors.door(
+        kind=_doors.Kind.query,
+        answers=_doors.AnswersAs.value,
+        effect=_doors.EffectClass.oracleIO,
+        determinism=_doors.Determinism.det,
+        state=_doors.State.any,
+        tiers=(_doors.Tier.sync,),
+        provider=_doors.Provider('metta-pandas', 'tables'),
         evidence=('extensions/python/ext/metta-pandas/tests/test_pandas_doors.py::test_pandas_namespace_and_short_sugars_share_the_row',),
-        sugar_of=Sugar("rows:to", (("library", 'pandas'),)),
-    ),
-    Door(
-        owner=Owner.rows, name='to-df', kind=Kind.query,
-        signatures=(Signature("self", returns="Any"),), answers=AnswersAs.value,
-        effect=EffectClass.oracleIO, determinism=Determinism.det, state=State.any,
-        tiers=(Tier.sync,), body=None,
-        provider=Provider('metta-pandas', "tables"),
-        docs="These rows as a pandas DataFrame; the declared point rows.to('pandas').",
+        sugar_of=_doors.Sugar('rows:to', (('library', 'pandas'),)),
+    )
+    def to_df(rows: Rows) -> Any:
+        """These rows as a pandas DataFrame; the declared point rows.to('pandas')."""
+        return rows.to(library='pandas')
+
+class _AnswersSugar:
+    @staticmethod
+    @_doors.door(
+        kind=_doors.Kind.query,
+        answers=_doors.AnswersAs.value,
+        effect=_doors.EffectClass.oracleIO,
+        determinism=_doors.Determinism.det,
+        state=_doors.State.any,
+        tiers=(_doors.Tier.sync,),
+        provider=_doors.Provider('metta-pandas', 'tables'),
         evidence=('extensions/python/ext/metta-pandas/tests/test_pandas_doors.py::test_pandas_namespace_and_short_sugars_share_the_row',),
-        sugar_of=Sugar("rows:to", (("library", 'pandas'),)),
-    ),
-    Door(
-        owner=Owner.answers, name='to-df', kind=Kind.query,
-        signatures=(Signature("self", returns="Any"),), answers=AnswersAs.value,
-        effect=EffectClass.oracleIO, determinism=Determinism.det, state=State.any,
-        tiers=(Tier.sync,), body=None,
-        provider=Provider('metta-pandas', "tables"),
-        docs="These rows as a pandas DataFrame; the declared point rows.to('pandas').",
-        evidence=('extensions/python/ext/metta-pandas/tests/test_pandas_doors.py::test_pandas_namespace_and_short_sugars_share_the_row',),
-        sugar_of=Sugar("answers:to", (("library", 'pandas'),)),
-    ),
-)
+        sugar_of=_doors.Sugar('answers:to', (('library', 'pandas'),)),
+    )
+    def to_df(rows: Answers) -> Any:
+        """These rows as a pandas DataFrame; the declared point rows.to('pandas')."""
+        return rows.to(library='pandas')
 
 
 def register() -> None:
     """Publish the frame provider and the contracts that reach it."""
-    seam.door.register('metta-pandas', doors=DOORS)
+    seam.door.register('metta-pandas', doors=_doors.declarations(__name__))
     seam.frame.register(
         "pandas",
         module="pandas",

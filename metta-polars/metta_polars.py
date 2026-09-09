@@ -29,23 +29,13 @@ Open Obligations:
 
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
+import metta.doors as _doors
 from metta import seam
-from metta.doors import (
-    AnswersAs,
-    Body,
-    Door,
-    Kind,
-    Owner,
-    Provider,
-    Receiver,
-    Signature,
-    State,
-    Sugar,
-    Tier,
-)
-from metta.vocabularies import Determinism, EffectClass
+
+if TYPE_CHECKING:
+    from metta import Answers, Rows
 
 _MISSING: Final = (
     "to_pl() builds a polars DataFrame and polars is not installed; "
@@ -76,49 +66,62 @@ def _build(source: Any, projection: Any, view: Any) -> Any:
 
 
 
+@_doors.door(
+    kind=_doors.Kind.query,
+    answers=_doors.AnswersAs.value,
+    effect=_doors.EffectClass.oracleIO,
+    determinism=_doors.Determinism.det,
+    state=_doors.State.any,
+    tiers=(_doors.Tier.sync, _doors.Tier.context),
+    provider=_doors.Provider('metta-polars', 'tables'),
+    evidence=('extensions/python/ext/metta-polars/tests/test_polars_doors.py::test_polars_namespace_and_short_sugars_share_the_row',),
+    sugar_of=_doors.Sugar('rows:to', (('library', 'polars'),)),
+)
 def to_pl(rows: Any) -> Any:
     """These rows as a polars DataFrame; the declared point rows.to('polars')."""
     return rows.to('polars')
 
 
-# closed-set: decides; policy=this frame library declares its accessor and short receiver sugars; reads=Rows.to and Answers.to
-DOORS: tuple[Door, ...] = (
-    Door(
-        owner=Owner.namespace, name='to-pl', kind=Kind.query,
-        signatures=(Signature("rows: Any", returns="Any"),), answers=AnswersAs.value,
-        effect=EffectClass.oracleIO, determinism=Determinism.det, state=State.any,
-        tiers=(Tier.sync, Tier.context), body=Body('metta_polars', 'to_pl', Receiver.none),
-        provider=Provider('metta-polars', "tables"),
-        docs="These rows as a polars DataFrame; the declared point rows.to('polars').",
+
+
+class _RowsSugar:
+    @staticmethod
+    @_doors.door(
+        kind=_doors.Kind.query,
+        answers=_doors.AnswersAs.value,
+        effect=_doors.EffectClass.oracleIO,
+        determinism=_doors.Determinism.det,
+        state=_doors.State.any,
+        tiers=(_doors.Tier.sync,),
+        provider=_doors.Provider('metta-polars', 'tables'),
         evidence=('extensions/python/ext/metta-polars/tests/test_polars_doors.py::test_polars_namespace_and_short_sugars_share_the_row',),
-        sugar_of=Sugar("rows:to", (("library", 'polars'),)),
-    ),
-    Door(
-        owner=Owner.rows, name='to-pl', kind=Kind.query,
-        signatures=(Signature("self", returns="Any"),), answers=AnswersAs.value,
-        effect=EffectClass.oracleIO, determinism=Determinism.det, state=State.any,
-        tiers=(Tier.sync,), body=None,
-        provider=Provider('metta-polars', "tables"),
-        docs="These rows as a polars DataFrame; the declared point rows.to('polars').",
+        sugar_of=_doors.Sugar('rows:to', (('library', 'polars'),)),
+    )
+    def to_pl(rows: Rows) -> Any:
+        """These rows as a polars DataFrame; the declared point rows.to('polars')."""
+        return rows.to(library='polars')
+
+class _AnswersSugar:
+    @staticmethod
+    @_doors.door(
+        kind=_doors.Kind.query,
+        answers=_doors.AnswersAs.value,
+        effect=_doors.EffectClass.oracleIO,
+        determinism=_doors.Determinism.det,
+        state=_doors.State.any,
+        tiers=(_doors.Tier.sync,),
+        provider=_doors.Provider('metta-polars', 'tables'),
         evidence=('extensions/python/ext/metta-polars/tests/test_polars_doors.py::test_polars_namespace_and_short_sugars_share_the_row',),
-        sugar_of=Sugar("rows:to", (("library", 'polars'),)),
-    ),
-    Door(
-        owner=Owner.answers, name='to-pl', kind=Kind.query,
-        signatures=(Signature("self", returns="Any"),), answers=AnswersAs.value,
-        effect=EffectClass.oracleIO, determinism=Determinism.det, state=State.any,
-        tiers=(Tier.sync,), body=None,
-        provider=Provider('metta-polars', "tables"),
-        docs="These rows as a polars DataFrame; the declared point rows.to('polars').",
-        evidence=('extensions/python/ext/metta-polars/tests/test_polars_doors.py::test_polars_namespace_and_short_sugars_share_the_row',),
-        sugar_of=Sugar("answers:to", (("library", 'polars'),)),
-    ),
-)
+        sugar_of=_doors.Sugar('answers:to', (('library', 'polars'),)),
+    )
+    def to_pl(rows: Answers) -> Any:
+        """These rows as a polars DataFrame; the declared point rows.to('polars')."""
+        return rows.to(library='polars')
 
 
 def register() -> None:
     """Publish the frame provider and the contracts that reach it."""
-    seam.door.register('metta-polars', doors=DOORS)
+    seam.door.register('metta-polars', doors=_doors.declarations(__name__))
     seam.frame.register(
         "polars",
         module="polars",

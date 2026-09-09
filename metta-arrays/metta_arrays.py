@@ -110,13 +110,24 @@ from collections.abc import Iterable
 from functools import wraps
 from typing import Annotated, Any, Final, Literal, NewType, cast
 
-from metta import Space, seam
-from metta import integrate as _integrate
-from metta import ops as _ops
-from metta import typing as _typing
-from metta.atoms import Atom, Expression, Grounded, S, Symbol, V, Variable, ground
+import metta.integrate as _integrate
+import metta.typing as _typing
+from metta import (
+    Atom,
+    Expression,
+    Grounded,
+    MettaError,
+    S,
+    Space,
+    Symbol,
+    V,
+    Variable,
+    ground,
+    registered,
+    seam,
+    withdraw,
+)
 from metta.convert import decode as _decode
-from metta.errors import MettaError
 
 #: Bound once, because these are per-call on the hot paths and a service lookup
 #: is two dictionary reads. `alpha-eq` is MeTTa's =alpha and `module` is the
@@ -471,7 +482,7 @@ def _alias_types(name: str, library: str) -> list[Expression]:
     uninstall() withdraws them, both reading them from the registration rather
     than restating the arrow shapes.
     """
-    operation = _ops.registered().get(f"{name}--{library}")
+    operation = registered().get(f"{name}--{library}")
     if operation is None:
         return []
     return [
@@ -705,7 +716,7 @@ def _retire_unclaimed(m: Any, names: Iterable[str]) -> list[str]:
     reach the registry, being alias equations, and are skipped here.
     """
     claimed = _claimed_ops(m)
-    known = _ops.registered()
+    known = registered()
     retired = [
         name
         for name in dict.fromkeys(names)
@@ -960,7 +971,7 @@ def install(m, default: Any = None) -> list[str]:  # noqa: C901  -- install keep
         *,
         name: str,
         effect: str,
-        # policy-inventory-exempt: mechanism-internal; reason=encoded and raw are the registration transport's two wire-crossing modes, decoded once into the (op ...) kind; evidence=extensions/python/metta/ops.py:_operation_kind
+        # policy-inventory-exempt: mechanism-internal; reason=encoded and raw are the registration transport's two wire-crossing modes, decoded once into the (op ...) kind; evidence=extensions/python/metta/_declare/operations.py:_operation_kind
         transport: Literal["encoded", "raw"] = "raw",
         **kw,
     ):
@@ -1004,7 +1015,7 @@ def install(m, default: Any = None) -> list[str]:  # noqa: C901  -- install keep
         *,
         name: str,
         effect: str,
-        # policy-inventory-exempt: mechanism-internal; reason=encoded and raw are the registration transport's two wire-crossing modes, decoded once into the (op ...) kind; evidence=extensions/python/metta/ops.py:_operation_kind
+        # policy-inventory-exempt: mechanism-internal; reason=encoded and raw are the registration transport's two wire-crossing modes, decoded once into the (op ...) kind; evidence=extensions/python/metta/_declare/operations.py:_operation_kind
         transport: Literal["encoded", "raw"] = "raw",
         **kw,
     ):
@@ -1344,10 +1355,10 @@ def uninstall(m) -> list[str]:
     # An operation another space still claims stays registered, but it may not
     # go on being DECLARED here: its rows would keep the space describing a
     # function it no longer routes to, and answering calls on it.
-    known = _ops.registered()
+    known = registered()
     for name in dict.fromkeys(names):
         if name not in retired and name in known:
-            _ops.withdraw(m.runtime, name, str(m.name))
+            withdraw(m.runtime, name, str(m.name))
     return retired
 
 
@@ -1376,7 +1387,7 @@ def _swap(xp, a, d0: int, d1: int):
 
 
 def _known_ops() -> set[str]:
-    return set(_ops.registered())
+    return set(registered())
 
 
 class EmbeddingStore:

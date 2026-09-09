@@ -9,25 +9,27 @@ Owns resources: registration holds immutable metadata only. A returned Live
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from metta import seam
-from metta.atoms import parse
-from metta.doors import (
-    AnswersAs,
-    Body,
-    Door,
-    Kind,
-    Owner,
-    Provider,
-    Receiver,
-    Signature,
-    Tier,
+import metta.doors as _doors
+from metta import parse, seam
+
+if TYPE_CHECKING:
+    from metta import SpaceLike
+from metta.vocabularies import SubscriptionEdge
+
+
+@_doors.door(
+    kind=_doors.Kind.query,
+    answers=_doors.AnswersAs.value,
+    effect=_doors.EffectClass.oracleIO,
+    determinism=_doors.Determinism.det,
+    tiers=(_doors.Tier.sync, _doors.Tier.context, _doors.Tier.async_),
+    provider=_doors.Provider('metta-live', 'live', callable=True),
+    evidence=('extensions/python/ext/metta-live/tests/test_live_doors.py::test_live_namespace_preserves_view_lifecycle',),
+    alias='live',
 )
-from metta.vocabularies import Determinism, EffectClass, SubscriptionEdge
-
-
-def view(space, *query: Any, on: SubscriptionEdge = SubscriptionEdge.both,
+def view(space: SpaceLike, *query: Any, on: SubscriptionEdge = SubscriptionEdge.both,
          strategy: str | None = None) -> Any:
     """Maintain a query's multiset through this space's committed writes.
 
@@ -41,24 +43,13 @@ def view(space, *query: Any, on: SubscriptionEdge = SubscriptionEdge.both,
                 on=on, strategy=strategy)
 
 
-# closed-set: decides; policy=this package owns these accessor contracts; reads=the named implementation signatures checked by tools/doorgen.py
-DOORS: tuple[Door, ...] = (
-    Door(
-        owner=Owner.namespace, name='view', kind=Kind.query,
-        signatures=(Signature('space, *query: Any, on: SubscriptionEdge=SubscriptionEdge.both, strategy: str | None=None', returns='Any'),), answers=AnswersAs.value,
-        effect=EffectClass.oracleIO, determinism=Determinism.det,
-        tiers=(Tier.sync, Tier.context, Tier.async_), body=Body('metta_live', 'view', Receiver.space),
-        provider=Provider('metta-live', 'live', callable=True),
-        docs="Maintain a query's multiset through this space's committed writes.\n\nThe returned Live owns its subscriptions. close() releases them, and\nchanges() reads its progress and deltas. strategy selects pattern, heads,\nor tabled maintenance; omitting it selects from the query's shape.",
-        evidence=('extensions/python/ext/metta-live/tests/test_live_doors.py::test_live_namespace_preserves_view_lifecycle',),
-        alias="live",
-    ),
-)
+
+
 
 
 def register() -> None:
     """Publish this package's complete accessor declaration atomically."""
-    seam.door.register('metta-live', doors=DOORS)
+    seam.door.register('metta-live', doors=_doors.declarations(__name__))
 
 
 register()

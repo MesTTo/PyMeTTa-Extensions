@@ -14,7 +14,8 @@ from __future__ import annotations
 import metta_graphql  # noqa: F401  -- imported for the graphql row it registers
 import pytest
 
-from metta import remote, seam
+import metta.remote._gateway as _moved_metta_remote__gateway
+from metta import seam
 
 pytest.importorskip("graphql")
 
@@ -37,7 +38,7 @@ def test_the_row_claims_the_graphql_point():
 
 def test_a_query_answers_the_spaces_own_rows(served):
     """The whole door, end to end: SDL from the seat, execution from here."""
-    with remote.Gateway(served) as gateway:
+    with _moved_metta_remote__gateway.Gateway(served) as gateway:
         answer = gateway("graphql", {"query": "{ users { x1 x2 } }"})
     assert answer["data"]["users"] == [
         {"x1": 1, "x2": "Ada"},
@@ -47,9 +48,9 @@ def test_a_query_answers_the_spaces_own_rows(served):
 
 def test_a_malformed_request_is_refused(served):
     """GraphQL over HTTP's own shape: a request needs a `query` string."""
-    from metta.errors import MettaError
+    from metta import MettaError
 
-    with remote.Gateway(served) as gateway:
+    with _moved_metta_remote__gateway.Gateway(served) as gateway:
         with pytest.raises(MettaError, match="needs a `query` field"):
             gateway("graphql", {})
         with pytest.raises(MettaError, match="variables must be an object"):
@@ -74,7 +75,7 @@ def test_the_seats_scalars_are_what_serialize(served):
 
     row.fields["schema"] = watched
     try:
-        with remote.Gateway(served) as gateway:
+        with _moved_metta_remote__gateway.Gateway(served) as gateway:
             answer = gateway("graphql", {"query": "{ users { x1 } }"})
     finally:
         row.fields["schema"] = real

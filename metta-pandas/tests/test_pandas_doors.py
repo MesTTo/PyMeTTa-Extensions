@@ -8,8 +8,7 @@ Owns resources: the Answers context closes its source and the engine context.
 import metta_pandas
 import pytest
 
-from metta import G, MeTTa, S
-from metta.results import Answers, Rows
+from metta import Answers, G, MeTTa, Rows, S
 
 pandas = pytest.importorskip("pandas")
 

@@ -14,8 +14,7 @@ from __future__ import annotations
 import metta_websocket  # noqa: F401  -- imported for the transport-error row
 import pytest
 
-from metta import seam
-from metta.errors import is_transport_failure
+from metta import is_transport_failure, seam
 
 websocket = pytest.importorskip("websocket")
 

@@ -15,8 +15,8 @@ import metta_numpy  # noqa: F401  -- imported for the array row it registers
 import pytest
 from hypothesis import given
 
+import metta.testing as pt
 from metta import seam
-from metta import testing as pt
 
 numpy = pytest.importorskip("numpy")
 

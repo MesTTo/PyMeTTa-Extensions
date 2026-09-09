@@ -14,8 +14,7 @@ from __future__ import annotations
 import metta_nanoarrow  # noqa: F401  -- imported for the arrow row it registers
 import pytest
 
-from metta import G, S, seam
-from metta.results import Rows
+from metta import G, Rows, S, seam
 
 nanoarrow = pytest.importorskip("nanoarrow")
 

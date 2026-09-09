@@ -8,8 +8,8 @@ Open Obligations:
 import metta_numpy  # noqa: F401  -- imported for the array row it registers
 import pytest
 
+import metta.testing as pt
 from metta import Grounded, convert
-from metta import testing as pt
 
 pytest.importorskip("numpy")
 hypothesis = pytest.importorskip("hypothesis")

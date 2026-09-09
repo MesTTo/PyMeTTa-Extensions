@@ -98,7 +98,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from metta.atoms import Atom, Expression
+from metta import Atom, Expression
 
 _SCHEMA = 1
 _COUNTER_SAMPLES = 3

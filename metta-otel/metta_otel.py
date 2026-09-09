@@ -74,9 +74,7 @@ import time
 from contextlib import ExitStack, contextmanager
 from typing import TYPE_CHECKING, Any, Final
 
-from metta import seam
-from metta.atoms import Expression
-from metta.errors import MettaError
+from metta import Expression, MettaError, seam
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -135,7 +133,7 @@ def spans(
     `trace` is a `Trace` or a `Recording`, which carries one and knows its space.
     A `call` opens a span named by the head with `metta.term`, `metta.depth`,
     `metta.seq` and, when it is known, `metta.space`; the matching `exit` ends it
-    with `metta.answer`; a `fail` ends it with status ERROR and
+    with `metta._atoms.answer`; a `fail` ends it with status ERROR and
     `metta.exit=fail`; a reduction a bound cut before either ends where the trace
     does with `metta.exit=absent`. Nesting follows the events' own depth.
 
@@ -180,7 +178,7 @@ def spans(
             # recording and a selected head can sit under an excluded one.
             continue
         if event.kind == "exit":
-            span.set_attribute("metta.answer", str(event.answer))
+            span.set_attribute("metta._atoms.answer", str(event.answer))
         else:
             span.set_attribute("metta.exit", "fail")
             span.set_status(otel.Status(otel.StatusCode.ERROR, "the reduction answered nothing"))

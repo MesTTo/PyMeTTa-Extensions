@@ -9,8 +9,7 @@ import metta_arrays_doors
 import metta_numpy
 import pytest
 
-from metta import Expression, MeTTa
-from metta.errors import MettaError
+from metta import Expression, MeTTa, MettaError
 
 numpy = pytest.importorskip("numpy")
 

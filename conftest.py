@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import pytest
 
-from metta import pytest_plugin as metta_pytest_plugin
+import metta.pytest_plugin as metta_pytest_plugin
 
 
 def pytest_configure(config: pytest.Config) -> None:

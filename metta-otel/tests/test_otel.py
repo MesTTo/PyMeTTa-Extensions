@@ -35,8 +35,7 @@ from __future__ import annotations
 import pytest
 from metta_otel import observe, spans
 
-from metta import S
-from metta.errors import MettaError
+from metta import MettaError, S
 
 pytest.importorskip("opentelemetry.trace")
 pytest.importorskip("opentelemetry.sdk.trace")
@@ -117,7 +116,7 @@ def test_a_trace_becomes_one_span_per_reduction(nested, exporter):
     outermost = finished[-1]
     assert outermost.attributes["metta.term"] == "(tl-quad 3)"
     assert outermost.attributes["metta.depth"] == 0
-    assert outermost.attributes["metta.answer"] == "12"
+    assert outermost.attributes["metta._atoms.answer"] == "12"
     assert outermost.attributes["metta.space"] == nested.name
 
 
@@ -292,7 +291,7 @@ def test_a_filter_selects_what_the_block_records(nested, exporter):
 
 def test_the_doors_name_the_extra_when_opentelemetry_is_absent(nested, monkeypatch):
     """The refusal names the package and the extra, and says the API is enough."""
-    monkeypatch.setattr("metta._optional.import_module", _no_opentelemetry)
+    monkeypatch.setattr("metta._lazy.import_module", _no_opentelemetry)
     with pytest.raises(ImportError) as refusal:
         spans(nested.trace(S["tl-double"](1)), tracer=None)
     assert "pymetta[otel]" in str(refusal.value)

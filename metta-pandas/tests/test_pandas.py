@@ -20,8 +20,7 @@ from __future__ import annotations
 import metta_pandas  # noqa: F401  -- imported for the frame row it registers
 import pytest
 
-from metta import G, S, seam
-from metta.results import Rows
+from metta import G, Rows, S, seam
 
 pandas = pytest.importorskip("pandas")
 

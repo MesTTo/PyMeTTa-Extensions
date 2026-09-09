@@ -67,16 +67,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from metta import (
-    Expression,
-    MeTTa,
-    S,
-    V,
-    convert,
-    ground,
-)
-from metta.errors import MettaError
-from metta.ops import registered
+from metta import Expression, MeTTa, MettaError, S, V, convert, ground, registered
 from metta.vocabularies import EffectClass
 
 numpy = pytest.importorskip("numpy")

@@ -1,6 +1,6 @@
 """Purpose: websocket-client's own timeouts, so an absent backend reads as absent.
 
-`metta.errors.is_transport_failure` asks whether a failure means the backend is
+`metta._errors.errors.is_transport_failure` asks whether a failure means the backend is
 ABSENT rather than wrong, which decides whether a client retries or reports.
 The obvious test does not separate them: a socket timeout raises OSError, but
 websocket-client's own timeout does NOT subclass it, so "is the cause an

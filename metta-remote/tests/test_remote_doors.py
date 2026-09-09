@@ -8,7 +8,7 @@ Owns resources: the server context closes its socket, worker, and answer cursors
 import metta_remote
 
 from metta import MeTTa, S
-from metta.remote import RemoteSpace
+from metta.remote._client import RemoteSpace
 
 
 def test_remote_namespace_preserves_transport_and_server_lifetimes():

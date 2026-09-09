@@ -35,8 +35,7 @@ from __future__ import annotations
 
 from typing import Any, Final
 
-from metta import seam
-from metta.errors import MettaError
+from metta import MettaError, seam
 
 _MISSING: Final = (
     "executing a GraphQL query needs graphql-core, which is not installed; "
