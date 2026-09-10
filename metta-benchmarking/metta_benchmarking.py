@@ -8,7 +8,7 @@ ruling is that nothing binds, so a caller imports them from here.
 Guarantees:
   - checkout_path_refusal reports differing declared length or depth with
     the baseline's measured reason [tested:
-    test_a_baseline_compares_checkout_length_and_depth; commit=WORKTREE]
+    test_a_baseline_compares_checkout_length_and_depth; commit=8ca8a387fc61d0918484b19a1a3baf85b6523043]
   - benchmark_case uses fresh untimed setup for every counter sample,
     warmup, and timed round [tested test_benchmark_case_uses_fresh_state]
   - engine movement is decided by the minimum of three inference counts

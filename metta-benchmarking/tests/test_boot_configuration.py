@@ -3,7 +3,7 @@
 Guarantees: both boot counters decline a different checkout shape, including
 updates, while comparable boot and runtime regressions still fail
 [tested: test_boot_path_refuses_both_counters_and_preserves_pins,
-test_comparable_counters_still_gate; commit=WORKTREE].
+test_comparable_counters_still_gate; commit=8ca8a387fc61d0918484b19a1a3baf85b6523043].
 """
 
 import importlib.util

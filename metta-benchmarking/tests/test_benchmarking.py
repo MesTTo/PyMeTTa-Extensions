@@ -3,9 +3,9 @@ Guarantees:
   - steady-state warmup garbage is collected before perf opens; collection
     failure still releases the workload [tested:
     test_steady_workloads_collect_before_the_window,
-    test_collection_failure_releases_the_workload; commit=WORKTREE]
+    test_collection_failure_releases_the_workload; commit=8ca8a387fc61d0918484b19a1a3baf85b6523043]
   - checkout shape compares each declared dimension independently [tested:
-    test_a_baseline_compares_checkout_length_and_depth; commit=WORKTREE]
+    test_a_baseline_compares_checkout_length_and_depth; commit=8ca8a387fc61d0918484b19a1a3baf85b6523043]
   - a built chapter-19 handle extension makes the round-trip benchmark execute
     rather than skip [tested:
     test_handle_benchmark_reaches_the_built_chapter_19_library;
