@@ -6,6 +6,9 @@ through the public space surface and imports two atom classes and nothing
 else. `metta.testing` used to re-export its ten names; the compatibility
 ruling is that nothing binds, so a caller imports them from here.
 Guarantees:
+  - checkout_path_refusal reports differing declared length or depth with
+    the baseline's measured reason [tested:
+    test_a_baseline_compares_checkout_length_and_depth; commit=WORKTREE]
   - benchmark_case uses fresh untimed setup for every counter sample,
     warmup, and timed round [tested test_benchmark_case_uses_fresh_state]
   - engine movement is decided by the minimum of three inference counts
@@ -527,24 +530,29 @@ class BenchmarkBaseline:
     def cases(self) -> Mapping[str, Mapping[str, Any]]:  # noqa: D102  -- the enclosing type and implemented protocol supply this method contract
         return self._document["benchmarks"]
 
-    def pinned_checkout_path_length(self) -> int | None:
-        """How long the repository root was when this document's pins were taken.
+    def checkout_path_refusal(self, checkout: Path) -> str | None:
+        """Explain a different declared checkout shape, or allow comparison.
 
-        None when the document does not say, which is every baseline that has
-        no counter sensitive to it. A seat whose numbers move with the path
-        records `measurement.checkout_path_length` and compares the live root
-        against it, so a pin taken at the repository root is not read from a
-        worktree as a regression
-        [source: extensions/cmetta/benchmarks/baseline.json,
-        measurement.checkout_path_length_note].
+        Only counters whose driver declares the boot window use this guard.
+        The baseline owns each dimension and the measured reason for it.
         """
         measurement = self._document.get("measurement")
         if not isinstance(measurement, Mapping):
             return None
-        length = measurement.get("checkout_path_length")
-        if isinstance(length, bool) or not isinstance(length, int):
+        actual = {"length": len(str(checkout)), "depth": len(checkout.parts) - 1}
+        pinned = {
+            dimension: value
+            for dimension in actual
+            if type(value := measurement.get(f"checkout_path_{dimension}")) is int
+        }
+        if all(actual[dimension] == value for dimension, value in pinned.items()):
             return None
-        return length
+        reason = measurement.get("checkout_path_reason", "location-sensitive boot counters")
+        return (
+            f"checkout length {actual['length']}, depth {actual['depth']}; "
+            f"canonical length {pinned.get('length', 'unspecified')}, "
+            f"depth {pinned.get('depth', 'unspecified')}; {reason}"
+        )
 
     def observe_counter(
         self,

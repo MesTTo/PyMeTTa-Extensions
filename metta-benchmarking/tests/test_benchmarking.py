@@ -1,5 +1,11 @@
 """Purpose: verify reusable benchmark setup, counter, and perf plumbing.
 Guarantees:
+  - steady-state warmup garbage is collected before perf opens; collection
+    failure still releases the workload [tested:
+    test_steady_workloads_collect_before_the_window,
+    test_collection_failure_releases_the_workload; commit=WORKTREE]
+  - checkout shape compares each declared dimension independently [tested:
+    test_a_baseline_compares_checkout_length_and_depth; commit=WORKTREE]
   - a built chapter-19 handle extension makes the round-trip benchmark execute
     rather than skip [tested:
     test_handle_benchmark_reaches_the_built_chapter_19_library;
@@ -13,6 +19,7 @@ Open Obligations:
 import json
 import os
 import signal
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -555,6 +562,51 @@ def test_perf_workload_teardown_runs_after_failure(monkeypatch):  # noqa: D103  
     with pytest.raises(LookupError, match="workload failed"):
         perf_workload_main(["failing-probe"])
     assert events == ["operation", "teardown"]
+
+
+@pytest.mark.parametrize('case', ['alpha-unique', 'subscription-dispatch', 'cold-probe'])
+def test_steady_workloads_collect_before_the_window(case, monkeypatch):
+    """Warmup garbage belongs to setup; a cold workload keeps its first call."""
+    events = []
+
+    def operation():
+        events.append('operation')
+        return 1
+
+    def collect(module, predicate):
+        assert (module, predicate) == ('system', 'garbage_collect')
+        events.append('collect')
+
+    def window(goal):
+        events.append('enable')
+        result = goal()
+        events.append('disable')
+        return result
+
+    monkeypatch.setitem(PERF_CASES, case, lambda: (operation, lambda: events.append('close')))
+    monkeypatch.setattr('janus_swi.cmd', collect)
+    monkeypatch.setattr('benchmarks.pure._controlled', window)
+    assert perf_workload_main([case, '--controlled']) == 0
+    setup = [] if case == 'cold-probe' else ['operation', 'collect']
+    assert events == [*setup, 'enable', 'operation', 'disable', 'close']
+
+
+def test_collection_failure_releases_the_workload(monkeypatch):
+    """A failed collection cannot open the window or abandon the workload."""
+    events = []
+
+    def collect(_module, _predicate):
+        events.append('collect')
+        msg = 'collection failed'
+        raise RuntimeError(msg)
+
+    monkeypatch.setitem(PERF_CASES, 'alpha-unique',
+                        lambda: (lambda: 1, lambda: events.append('close')))
+    monkeypatch.setattr('janus_swi.cmd', collect)
+    monkeypatch.setattr('benchmarks.pure._controlled', lambda _goal: events.append('enable'))
+    with pytest.raises(RuntimeError, match='collection failed'):
+        perf_workload_main(['alpha-unique', '--controlled'])
+    assert events == ['collect', 'close']
 
 
 def test_count_atoms_derives_the_wire_workload_size():  # noqa: D103  -- pytest discovers or injects this callable; its descriptive name states the contract
@@ -1177,26 +1229,25 @@ def test_one_line_decides_whether_a_refusal_is_also_red(monkeypatch):
     assert refusal_is_fatal() is True
 
 
-def test_a_baseline_says_what_checkout_length_its_pins_were_taken_at(tmp_path):
-    """A pin that moves with the path says which path, or says nothing.
-
-    The C seat's boot instruction count scales with the length of the engine
-    path the process resolves, about 0.045% per character, so the pin is true
-    of one checkout and the lane has to be able to tell it is somewhere else.
-    A baseline with no such counter says nothing and every row compares.
-    """
+def test_a_baseline_compares_checkout_length_and_depth(tmp_path):
+    """A declared dimension decides independently; undeclared ones do not."""
+    checkout = Path('/aaaa/bbbb/cccc/dddd/eeeeeeee')
     silent = tmp_path / "silent.json"
     silent.write_text(json.dumps({"schema": 1, "benchmarks": {}}), encoding="utf-8")
-    assert BenchmarkBaseline(silent).pinned_checkout_path_length() is None
+    assert BenchmarkBaseline(silent).checkout_path_refusal(checkout) is None
 
     speaking = tmp_path / "speaking.json"
     speaking.write_text(
         json.dumps(
-            {"schema": 1, "benchmarks": {}, "measurement": {"checkout_path_length": 29}}
+            {"schema": 1, "benchmarks": {}, "measurement":
+             {"checkout_path_length": 29, "checkout_path_depth": 5}}
         ),
         encoding="utf-8",
     )
-    assert BenchmarkBaseline(speaking).pinned_checkout_path_length() == 29
+    baseline = BenchmarkBaseline(speaking)
+    assert baseline.checkout_path_refusal(checkout) is None
+    assert 'canonical length 29, depth 5' in baseline.checkout_path_refusal(checkout / 'x')
+    assert baseline.checkout_path_refusal(Path('/aaaa/bbbb/cccc/eeeeeeeeeeeee'))
 
     for nonsense in ("29", True, None, 1.5):
         broken = tmp_path / "broken.json"
@@ -1210,4 +1261,4 @@ def test_a_baseline_says_what_checkout_length_its_pins_were_taken_at(tmp_path):
             ),
             encoding="utf-8",
         )
-        assert BenchmarkBaseline(broken).pinned_checkout_path_length() is None
+        assert BenchmarkBaseline(broken).checkout_path_refusal(checkout) is None
