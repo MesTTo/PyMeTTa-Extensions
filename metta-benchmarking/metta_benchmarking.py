@@ -950,7 +950,7 @@ def prepare_governed_artifacts(root: Path, *, swipl: str = "swipl") -> tuple[str
     preparation and 319,073 with two library artifacts another lane left
     beside the three the boot compiles, past the four-inference allowance
     [measured 2026-09-11: sh check.sh engine-bench after the re-pin lanes
-    versus after this preparation; fixture=the merged tree 8e6968ecb; commit=WORKTREE].
+    versus after this preparation; fixture=the merged tree 8e6968ecb; commit=23033852660c31aeadeb2719a1eead355c36e0bf].
     A generating boot is a different workload from a loading one (3,129,543
     against 612,598 inferences, engine/bench.py's header), which is why the
     warm boot is a child of its own and never the measured process.
