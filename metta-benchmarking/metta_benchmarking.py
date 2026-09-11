@@ -92,6 +92,7 @@ import json
 import os
 import shutil
 import signal
+import subprocess
 import sys
 import tempfile
 import time
@@ -928,6 +929,71 @@ class MeasurementRefusedError(RuntimeError):
     """
 
 
+#: The line the ordinary warm boot prints per governed artifact it left behind.
+GOVERNED_ARTIFACT_MARKER = "governed-artifact "
+
+
+def prepare_governed_artifacts(root: Path, *, swipl: str = "swipl") -> tuple[str, ...]:
+    """Purge the governed .qlf set, warm it through the ordinary boot, list it.
+
+    Two child processes, neither of them measured. The first runs
+    engine/qlf_boot.pl's own purge door (metta_qlf_boot:purge_all_qlf/0),
+    which deletes every artifact the boot governs: the engine units and the
+    library halves an earlier lane compiled beside their source. The second is
+    the ordinary boot through engine/bench.pl (metta_bench:bench_run(boot)),
+    which generates the set the shipping boot loads and then lists it through
+    the boot's own inventory door (metta_qlf_boot:qlf_files/2). The inventory
+    comes back as repository-relative paths in the engine's order, so a driver
+    pins its length and a fixture compares its members, and every boot row
+    (engine/bench-baseline.json, the C fixture) reads one artifact state
+    whatever ran before it: a boot reads 319,090 inferences after this
+    preparation and 319,073 with two library artifacts another lane left
+    beside the three the boot compiles, past the four-inference allowance
+    [measured 2026-09-11: sh check.sh engine-bench after the re-pin lanes
+    versus after this preparation; fixture=the merged tree 8e6968ecb; commit=WORKTREE].
+    A generating boot is a different workload from a loading one (3,129,543
+    against 612,598 inferences, engine/bench.py's header), which is why the
+    warm boot is a child of its own and never the measured process.
+    """
+    engine = Path(root) / "engine"
+    # Both argument vectors are a fixed executable name, fixed flags and goals
+    # built from this tree's own file names, never from input.
+    subprocess.run(  # noqa: S603
+        [swipl, "-q", "-s", str(engine / "qlf_boot.pl"),
+         "-g", "metta_qlf_boot:purge_all_qlf", "-t", "halt"],
+        check=True, capture_output=True, text=True,
+    )
+    warmed = subprocess.run(  # noqa: S603
+        [
+            swipl, "-q", "--stack_limit=8g", "-g",
+            "metta_bench:bench_run(boot),"
+            "metta_bench:bench_engine_directory(Here),"
+            "metta_qlf_boot:qlf_files(Here,Files),"
+            "forall(lists:member(File,Files),"
+            f"format('{GOVERNED_ARTIFACT_MARKER}~w~n',[File]))",
+            "-t", "halt", str(engine / "bench.pl"),
+        ],
+        check=True, capture_output=True, text=True,
+    )
+    listed = [
+        line[len(GOVERNED_ARTIFACT_MARKER):].strip()
+        for line in warmed.stdout.splitlines()
+        if line.startswith(GOVERNED_ARTIFACT_MARKER)
+    ]
+    if not listed:
+        msg = f"the warm boot listed no governed artifact: {warmed.stdout!r}"
+        raise RuntimeError(msg)
+    resolved_root = Path(root).resolve()
+    relative = []
+    for path in listed:
+        candidate = Path(path)
+        try:
+            relative.append(str(candidate.resolve().relative_to(resolved_root)))
+        except ValueError:
+            relative.append(path)
+    return tuple(relative)
+
+
 def _paranoid_reading() -> str:
     """What perf_event_paranoid says right now, or why it could not be read."""
     try:
@@ -1297,6 +1363,7 @@ def _run_perf(
 
 __all__ = [
     "CPU_SECONDS",
+    "GOVERNED_ARTIFACT_MARKER",
     "INSTRUCTIONS",
     "LOAD_PER_CORE_CEILING",
     "PERF_CONTROL_REFUSED",
@@ -1311,6 +1378,7 @@ __all__ = [
     "measure_counters",
     "measure_instructions",
     "measured_main",
+    "prepare_governed_artifacts",
     "refusal_is_fatal",
     "time_is_measurable",
 ]
