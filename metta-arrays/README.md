@@ -17,3 +17,21 @@ Its tests are in `tests/`, and they run in the workspace suite:
 ```sh
 sh extensions/python/test.sh ext/metta-arrays
 ```
+
+The wheel also advertises `lib_arrays` through `metta.libraries`. Its face
+derives `arrays-is-array` and its arrow and documentation from `is_array`:
+
+```python
+import importlib
+from metta import MeTTa, importing
+
+with MeTTa() as m:
+    with importing.install(m.self):
+        arrays = importlib.import_module("lib_arrays")
+        assert m.eval(arrays.arrays_is_array((1, 2, 3))) == [False]
+```
+
+The `face-sync` check includes faces shipped under `extensions/python/ext/`.
+Regenerate the face with `python extensions/python/tools/facegen.py --write
+extensions/python/ext/metta-arrays/metta_arrays_library/lib_arrays.metta`.
+The wheel test builds this distribution and executes the installed face.

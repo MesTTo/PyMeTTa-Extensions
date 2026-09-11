@@ -34,5 +34,12 @@ classifiers = [
 [project.entry-points."metta.extensions"]
 metta-arrays = "metta_arrays_doors"
 
+[project.entry-points."metta.libraries"]
+lib_arrays = "metta_arrays_library:sources"
+
 [tool.setuptools]
 py-modules = ["metta_arrays", "metta_arrays_doors"]
+packages = ["metta_arrays_library"]
+
+[tool.setuptools.package-data]
+metta_arrays_library = ["*.metta"]
