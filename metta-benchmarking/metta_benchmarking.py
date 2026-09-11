@@ -92,7 +92,7 @@ import json
 import os
 import shutil
 import signal
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tempfile
 import time
@@ -958,12 +958,12 @@ def prepare_governed_artifacts(root: Path, *, swipl: str = "swipl") -> tuple[str
     engine = Path(root) / "engine"
     # Both argument vectors are a fixed executable name, fixed flags and goals
     # built from this tree's own file names, never from input.
-    subprocess.run(  # noqa: S603
+    subprocess.run(  # noqa: S603  # nosec B603
         [swipl, "-q", "-s", str(engine / "qlf_boot.pl"),
          "-g", "metta_qlf_boot:purge_all_qlf", "-t", "halt"],
         check=True, capture_output=True, text=True,
     )
-    warmed = subprocess.run(  # noqa: S603
+    warmed = subprocess.run(  # noqa: S603  # nosec B603
         [
             swipl, "-q", "--stack_limit=8g", "-g",
             "metta_bench:bench_run(boot),"
