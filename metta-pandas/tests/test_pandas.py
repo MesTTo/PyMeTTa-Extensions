@@ -64,3 +64,22 @@ def test_the_accessor_installs_for_an_imported_pandas(scratch_space):
     frame = pandas.DataFrame({"a": [1], "b": ["x"]})
     assert frame.metta.into(scratch_space, "prow") == 1
     assert len(scratch_space.match(scratch_space.parse("(prow $a $b)"))) == 1
+
+
+@pytest.mark.parametrize("values", [[], [1, 1, 2]])
+def test_frame_rows_use_the_declared_native_extractor(scratch_space, monkeypatch, values):
+    """The provider keeps native extraction reachable for empty and duplicate rows."""
+    from metta import tables
+    from metta._catalog import arrow
+
+    def refuse_arrow(_source):
+        msg = "native frame extraction must not open the Arrow reader"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(arrow, "read_batches", refuse_arrow)
+    row = seam.frame.find("pandas")
+    assert row.rows(object()) is None
+    frame = pandas.DataFrame({"value": values})
+    assert list(row.rows(frame)) == [(value,) for value in values]
+    assert tables.add(scratch_space, "native", frame) == len(values)
+    assert len(scratch_space.atoms()) == len(values)

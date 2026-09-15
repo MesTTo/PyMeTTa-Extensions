@@ -12,6 +12,12 @@ rows.
 pip install metta-polars          # or: pip install 'pymetta[dataframes]'
 ```
 
+The frame row declares polars' native `iter_rows()` extraction.
+`frame.metta.into(space, "row")` reads and writes the whole frame in one
+transaction. Foreign stores require transactional writes; nested ingestion
+also requires provider savepoints. Input and cleanup failures roll back the
+load before its transaction commits.
+
 Its tests are in `tests/`, and they run in the workspace suite:
 
 ```sh

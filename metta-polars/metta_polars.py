@@ -13,6 +13,9 @@ Assumes:
   - polars is importable when a frame is actually BUILT; the row holds the
     module NAME and imports nothing
 Guarantees:
+  - frame ingestion declares polars' native row iterator and leaves unrelated
+    inputs unclaimed [tested: tests/test_polars.py::test_frame_rows_use_the_declared_native_extractor;
+    commit=WORKTREE]
   - namespace and short conversion methods come from door contracts; the
     frame row owns the builder and library accessor [tested:
     tests/test_polars.py::test_the_row_is_registered_against_the_frame_point,
@@ -29,6 +32,8 @@ Open Obligations:
 
 from __future__ import annotations
 
+import sys
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any, Final
 
 import metta.doors as _doors
@@ -48,6 +53,14 @@ require_module = seam.at("module").call()
 def _install_accessor(polars: Any, name: str, door: type) -> None:
     """`df.<name>` on a polars frame: its registered namespace."""
     polars.api.register_dataframe_namespace(name)(door)
+
+
+def _rows(source: Any) -> Iterator[Any] | None:
+    """Read an already imported polars frame through its native row iterator."""
+    polars = sys.modules.get("polars")
+    if polars is not None and isinstance(source, polars.DataFrame):
+        return source.iter_rows()
+    return None
 
 
 def _build(source: Any, projection: Any, view: Any) -> Any:
@@ -127,6 +140,7 @@ def register() -> None:
         module="polars",
         accessor=_install_accessor,
         build=_build,
+        rows=_rows,
     )
 
 
