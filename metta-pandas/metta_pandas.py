@@ -15,9 +15,10 @@ Assumes:
   - pandas is importable when a frame is actually BUILT; the row itself holds
     the module NAME and imports nothing, so `import metta._spaces.results` stays free
 Guarantees:
-  - frame ingestion declares pandas' native row iterator and leaves unrelated
-    inputs unclaimed [tested: tests/test_pandas.py::test_frame_rows_use_the_declared_native_extractor;
-    commit=01b2a9b3dfb721804cd8378610566e1985502289]
+  - frame ingestion declares pandas' native row iterator, `tables.add` calls it
+    for a frame, and unrelated inputs stay unclaimed [tested:
+    tests/test_pandas.py::test_frame_rows_use_the_declared_native_extractor;
+    commit=179bcf460e69f3f7e05683027983a063df0b482e]
   - namespace and short conversion methods come from door contracts; the
     frame row owns the builder and library accessor [tested:
     tests/test_pandas.py::test_the_row_is_registered_against_the_frame_point,
