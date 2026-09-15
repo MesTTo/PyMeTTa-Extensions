@@ -73,11 +73,20 @@ def test_the_seats_scalars_are_what_serialize(served):
         attached.update(scalars)
         return real(sdl, scalars)
 
-    row.fields["schema"] = watched
+    # A registration is immutable, so the watching row REPLACES this one and
+    # the original is registered back; reaching into `row.fields` would be the
+    # stale-snapshot bypass the frozen row exists to prevent.
+    def registered(schema):
+        seam.graphql.register(
+            "graphql-core", claims=row.fields["claims"], schema=schema,
+            execute=row.fields["execute"], missing=row.fields["missing"],
+        )
+
+    registered(watched)
     try:
         with _moved_metta_remote__gateway.Gateway(served) as gateway:
             answer = gateway("graphql", {"query": "{ users { x1 } }"})
     finally:
-        row.fields["schema"] = real
+        registered(real)
     assert sorted(attached) == ["Atom", "Number"]
     assert answer["data"]["users"][0]["x1"] == 1

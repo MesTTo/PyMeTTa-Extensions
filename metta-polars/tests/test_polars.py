@@ -64,19 +64,37 @@ def test_the_accessor_installs_for_an_imported_polars(scratch_space):
 
 
 @pytest.mark.parametrize("values", [[], [1, 1, 2]])
-def test_frame_rows_use_the_declared_native_extractor(scratch_space, monkeypatch, values):
-    """The provider keeps native extraction reachable for empty and duplicate rows."""
+def test_frame_rows_use_the_declared_native_extractor(scratch_space, values):
+    """The provider keeps native extraction reachable for empty and duplicate rows.
+
+    Ingestion is checked through the row itself: a replacement registration
+    wrapping the declared `rows` callback counts the calls `tables.add` makes,
+    so the assertion is that ingestion took this provider's declaration rather
+    than any other input shape.
+    """
     from metta import tables
-    from metta._catalog import arrow
 
-    def refuse_arrow(_source):
-        msg = "native frame extraction must not open the Arrow reader"
-        raise AssertionError(msg)
-
-    monkeypatch.setattr(arrow, "read_batches", refuse_arrow)
     row = seam.frame.find("polars")
     assert row.rows(object()) is None
     frame = polars.DataFrame({"value": values})
-    assert list(row.rows(frame)) == [(value,) for value in values]
-    assert tables.add(scratch_space, "native", frame) == len(values)
+    taken = []
+
+    def counted(source):
+        answer = row.rows(source)
+        taken.append(source is frame)
+        return answer
+
+    seam.frame.register(
+        "polars", module=row.fields["module"], accessor=row.fields["accessor"],
+        build=row.fields["build"], rows=counted,
+    )
+    try:
+        assert list(row.rows(frame)) == [(value,) for value in values]
+        assert tables.add(scratch_space, "native", frame) == len(values)
+    finally:
+        seam.frame.register(
+            "polars", module=row.fields["module"], accessor=row.fields["accessor"],
+            build=row.fields["build"], rows=row.fields["rows"],
+        )
+    assert taken == [True]
     assert len(scratch_space.atoms()) == len(values)
