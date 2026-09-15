@@ -15,7 +15,7 @@ Assumes:
 Guarantees:
   - frame ingestion declares polars' native row iterator and leaves unrelated
     inputs unclaimed [tested: tests/test_polars.py::test_frame_rows_use_the_declared_native_extractor;
-    commit=WORKTREE]
+    commit=01b2a9b3dfb721804cd8378610566e1985502289]
   - namespace and short conversion methods come from door contracts; the
     frame row owns the builder and library accessor [tested:
     tests/test_polars.py::test_the_row_is_registered_against_the_frame_point,
