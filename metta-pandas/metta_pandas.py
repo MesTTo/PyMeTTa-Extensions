@@ -95,7 +95,7 @@ def _build(source: Any, projection: Any, view: Any) -> Any:
     state=_doors.State.any,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
     provider=_doors.Provider('metta-pandas', 'tables'),
-    evidence=('extensions/python/ext/metta-pandas/tests/test_pandas_doors.py::test_pandas_namespace_and_short_sugars_share_the_row',),
+    evidence=('ext/metta-pandas/tests/test_pandas_doors.py::test_pandas_namespace_and_short_sugars_share_the_row',),
     sugar_of=_doors.Sugar('rows:to', (('library', 'pandas'),)),
 )
 def to_df(rows: Any) -> Any:
@@ -115,7 +115,7 @@ class _RowsSugar:
         state=_doors.State.any,
         tiers=(_doors.Tier.sync,),
         provider=_doors.Provider('metta-pandas', 'tables'),
-        evidence=('extensions/python/ext/metta-pandas/tests/test_pandas_doors.py::test_pandas_namespace_and_short_sugars_share_the_row',),
+        evidence=('ext/metta-pandas/tests/test_pandas_doors.py::test_pandas_namespace_and_short_sugars_share_the_row',),
         sugar_of=_doors.Sugar('rows:to', (('library', 'pandas'),)),
     )
     def to_df(rows: Rows) -> Any:
@@ -132,7 +132,7 @@ class _AnswersSugar:
         state=_doors.State.any,
         tiers=(_doors.Tier.sync,),
         provider=_doors.Provider('metta-pandas', 'tables'),
-        evidence=('extensions/python/ext/metta-pandas/tests/test_pandas_doors.py::test_pandas_namespace_and_short_sugars_share_the_row',),
+        evidence=('ext/metta-pandas/tests/test_pandas_doors.py::test_pandas_namespace_and_short_sugars_share_the_row',),
         sugar_of=_doors.Sugar('answers:to', (('library', 'pandas'),)),
     )
     def to_df(rows: Answers) -> Any:

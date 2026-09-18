@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
     provider=_doors.Provider('metta-remote', 'remote'),
-    evidence=('extensions/python/ext/metta-remote/tests/test_remote_doors.py::test_remote_namespace_preserves_transport_and_server_lifetimes',),
+    evidence=('ext/metta-remote/tests/test_remote_doors.py::test_remote_namespace_preserves_transport_and_server_lifetimes',),
 )
 def connect(url: str, timeout: float=30.0, *, token: str | None=None, headers: dict[str, str] | None=None, ssl_context: Any=None) -> Transport:
     """The HTTP transport for a serve()d engine: one POST per operation,
@@ -54,7 +54,7 @@ def connect(url: str, timeout: float=30.0, *, token: str | None=None, headers: d
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
     provider=_doors.Provider('metta-remote', 'remote'),
-    evidence=('extensions/python/ext/metta-remote/tests/test_remote_doors.py::test_remote_namespace_preserves_transport_and_server_lifetimes',),
+    evidence=('ext/metta-remote/tests/test_remote_doors.py::test_remote_namespace_preserves_transport_and_server_lifetimes',),
 )
 def serve(m: SpaceLike, host: str='127.0.0.1', port: int=0, spaces: list[str] | None=None, *, token: str | None=None, authorize: Callable[[Request], bool] | None=None, ssl_context: Any=None, cursor_idle: float=_CURSOR_IDLE, cursor_limit: int=_CURSOR_LIMIT, mutation_ttl: float=_MUTATION_TTL, mutation_limit: int=_MUTATION_LIMIT) -> Server:
     """Expose this engine's spaces over HTTP; port 0 picks a free one.

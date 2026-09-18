@@ -88,7 +88,7 @@ def _build(source: Any, projection: Any, view: Any) -> Any:
     state=_doors.State.any,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
     provider=_doors.Provider('metta-polars', 'tables'),
-    evidence=('extensions/python/ext/metta-polars/tests/test_polars_doors.py::test_polars_namespace_and_short_sugars_share_the_row',),
+    evidence=('ext/metta-polars/tests/test_polars_doors.py::test_polars_namespace_and_short_sugars_share_the_row',),
     sugar_of=_doors.Sugar('rows:to', (('library', 'polars'),)),
 )
 def to_pl(rows: Any) -> Any:
@@ -108,7 +108,7 @@ class _RowsSugar:
         state=_doors.State.any,
         tiers=(_doors.Tier.sync,),
         provider=_doors.Provider('metta-polars', 'tables'),
-        evidence=('extensions/python/ext/metta-polars/tests/test_polars_doors.py::test_polars_namespace_and_short_sugars_share_the_row',),
+        evidence=('ext/metta-polars/tests/test_polars_doors.py::test_polars_namespace_and_short_sugars_share_the_row',),
         sugar_of=_doors.Sugar('rows:to', (('library', 'polars'),)),
     )
     def to_pl(rows: Rows) -> Any:
@@ -125,7 +125,7 @@ class _AnswersSugar:
         state=_doors.State.any,
         tiers=(_doors.Tier.sync,),
         provider=_doors.Provider('metta-polars', 'tables'),
-        evidence=('extensions/python/ext/metta-polars/tests/test_polars_doors.py::test_polars_namespace_and_short_sugars_share_the_row',),
+        evidence=('ext/metta-polars/tests/test_polars_doors.py::test_polars_namespace_and_short_sugars_share_the_row',),
         sugar_of=_doors.Sugar('answers:to', (('library', 'polars'),)),
     )
     def to_pl(rows: Answers) -> Any:

@@ -26,7 +26,7 @@ from metta.vocabularies import SubscriptionEdge
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context, _doors.Tier.async_),
     provider=_doors.Provider('metta-live', 'live', callable=True),
-    evidence=('extensions/python/ext/metta-live/tests/test_live_doors.py::test_live_namespace_preserves_view_lifecycle',),
+    evidence=('ext/metta-live/tests/test_live_doors.py::test_live_namespace_preserves_view_lifecycle',),
     alias='live',
 )
 def view(space: SpaceLike, *query: Any, on: SubscriptionEdge = SubscriptionEdge.both,

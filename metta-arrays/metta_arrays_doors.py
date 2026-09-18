@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
     provider=_doors.Provider('metta-arrays', 'arrays'),
-    evidence=('extensions/python/ext/metta-arrays/tests/test_arrays_doors.py::test_array_namespace_preserves_installation_and_withdrawal',),
+    evidence=('ext/metta-arrays/tests/test_arrays_doors.py::test_array_namespace_preserves_installation_and_withdrawal',),
 )
 def install(m: SpaceLike, default: Any=None) -> list[str]:
     """Register the array operation set on the shared engine.
@@ -86,7 +86,7 @@ def install(m: SpaceLike, default: Any=None) -> list[str]:
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
     provider=_doors.Provider('metta-arrays', 'arrays'),
-    evidence=('extensions/python/ext/metta-arrays/tests/test_arrays_doors.py::test_array_namespace_preserves_installation_and_withdrawal',),
+    evidence=('ext/metta-arrays/tests/test_arrays_doors.py::test_array_namespace_preserves_installation_and_withdrawal',),
 )
 def uninstall(m: SpaceLike) -> list[str]:
     """Retire this space's array installation; answers what it unregistered.
@@ -130,7 +130,7 @@ def uninstall(m: SpaceLike) -> list[str]:
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
     provider=_doors.Provider('metta-arrays', 'arrays'),
-    evidence=('extensions/python/ext/metta-arrays/tests/test_arrays_doors.py::test_array_namespace_preserves_installation_and_withdrawal',),
+    evidence=('ext/metta-arrays/tests/test_arrays_doors.py::test_array_namespace_preserves_installation_and_withdrawal',),
 )
 def ops(m: SpaceLike) -> list[str]:
     """The array operation names installed in this space, in install order.
@@ -158,7 +158,7 @@ def ops(m: SpaceLike) -> list[str]:
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
     provider=_doors.Provider('metta-arrays', 'arrays'),
-    evidence=('extensions/python/ext/metta-arrays/tests/test_arrays_doors.py::test_array_namespace_preserves_installation_and_withdrawal',),
+    evidence=('ext/metta-arrays/tests/test_arrays_doors.py::test_array_namespace_preserves_installation_and_withdrawal',),
 )
 def backend(m: SpaceLike) -> str:
     """The array library this space's constructors build in.

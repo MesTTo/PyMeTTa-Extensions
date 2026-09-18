@@ -23,9 +23,9 @@ if TYPE_CHECKING:
     effect=_doors.EffectClass.oracleIO,
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
-    refuses=(_doors.Refusal(_doors.RefusalKind.type, 'extensions/python/ext/metta-tables/tests/test_tables_doors.py::test_tables_add_refuses_an_unsupported_source'),),
+    refuses=(_doors.Refusal(_doors.RefusalKind.type, 'ext/metta-tables/tests/test_tables_doors.py::test_tables_add_refuses_an_unsupported_source'),),
     provider=_doors.Provider('metta-tables', 'tables'),
-    evidence=('extensions/python/ext/metta-tables/tests/test_tables_doors.py::test_table_namespace_preserves_ingestion_and_conversions',),
+    evidence=('ext/metta-tables/tests/test_tables_doors.py::test_table_namespace_preserves_ingestion_and_conversions',),
 )
 def add(space: SpaceLike, head: Any, data: Any) -> int:
     """Add a tabular source to a space as ``(head column...)`` facts.
@@ -54,7 +54,7 @@ def add(space: SpaceLike, head: Any, data: Any) -> int:
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
     provider=_doors.Provider('metta-tables', 'tables'),
-    evidence=('extensions/python/ext/metta-tables/tests/test_tables_doors.py::test_table_namespace_preserves_ingestion_and_conversions',),
+    evidence=('ext/metta-tables/tests/test_tables_doors.py::test_table_namespace_preserves_ingestion_and_conversions',),
 )
 def declare(m: SpaceLike, name: str, declaration: Atom | str) -> Atom:
     """Write one ctx-scoped bridge declaration into &metta, where explain
@@ -71,7 +71,7 @@ def declare(m: SpaceLike, name: str, declaration: Atom | str) -> Atom:
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
     provider=_doors.Provider('metta-tables', 'tables'),
-    evidence=('extensions/python/ext/metta-tables/tests/test_tables_doors.py::test_table_namespace_preserves_ingestion_and_conversions',),
+    evidence=('ext/metta-tables/tests/test_tables_doors.py::test_table_namespace_preserves_ingestion_and_conversions',),
 )
 def accessors() -> tuple[str, ...]:
     """Install the metta accessor for every registered frame library already imported.
@@ -101,9 +101,9 @@ def accessors() -> tuple[str, ...]:
     effect=_doors.EffectClass.oracleIO,
     determinism=_doors.Determinism.det,
     tiers=(_doors.Tier.sync, _doors.Tier.context),
-    refuses=(_doors.Refusal(_doors.RefusalKind.type, 'extensions/python/ext/metta-tables/tests/test_tables_doors.py::test_tables_sql_function_refuses_noncallable_heads'),),
+    refuses=(_doors.Refusal(_doors.RefusalKind.type, 'ext/metta-tables/tests/test_tables_doors.py::test_tables_sql_function_refuses_noncallable_heads'),),
     provider=_doors.Provider('metta-tables', 'tables'),
-    evidence=('extensions/python/ext/metta-tables/tests/test_tables_doors.py::test_table_namespace_preserves_ingestion_and_conversions',),
+    evidence=('ext/metta-tables/tests/test_tables_doors.py::test_table_namespace_preserves_ingestion_and_conversions',),
 )
 def sql_function(connection: Any, head: Any, name: str | None=None) -> str:
     """Register a MeTTa head as a scalar SQL function, and answer its SQL name.

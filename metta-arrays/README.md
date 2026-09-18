@@ -31,7 +31,7 @@ with MeTTa() as m:
         assert m.eval(arrays.arrays_is_array((1, 2, 3))) == [False]
 ```
 
-The `face-sync` check includes faces shipped under `extensions/python/ext/`.
+The `face-sync` check includes faces shipped under `ext/`.
 Regenerate the face with `python extensions/python/tools/facegen.py --write
-extensions/python/ext/metta-arrays/metta_arrays_library/lib_arrays.metta`.
+ext/metta-arrays/metta_arrays_library/lib_arrays.metta`.
 The wheel test builds this distribution and executes the installed face.
