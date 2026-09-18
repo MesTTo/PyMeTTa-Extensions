@@ -23,24 +23,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from metta_benchmarking import (
-    CPU_SECONDS,
-    LOAD_PER_CORE_CEILING,
-    PERF_CONTROL_REFUSED,
-    BenchmarkBaseline,
-    MeasurementRefusedError,
-    _run_perf,
-    benchmark_case,
-    benchmark_counter_slope,
-    count_atoms,
-    load_per_core,
-    measure_counters,
-    measure_instructions,
-    measured_main,
-    refusal_is_fatal,
-    time_is_measurable,
-)
-
 from bench import CASES, _write_merged_json
 from bench import main as benchmark_main
 from benchmarks.check_instructions import _CASES as INSTRUCTION_CASES
@@ -64,6 +46,24 @@ from benchmarks.subscription import (
     subscription_dispatch_case,
 )
 from benchmarks.workloads import json_payload, json_wire, term_operators, wire_atom, wire_codec
+from metta_benchmarking import (
+    CPU_SECONDS,
+    LOAD_PER_CORE_CEILING,
+    PERF_CONTROL_REFUSED,
+    BenchmarkBaseline,
+    MeasurementRefusedError,
+    _run_perf,
+    benchmark_case,
+    benchmark_counter_slope,
+    count_atoms,
+    load_per_core,
+    measure_counters,
+    measure_instructions,
+    measured_main,
+    refusal_is_fatal,
+    time_is_measurable,
+)
+
 from metta import S
 
 
@@ -901,9 +901,8 @@ def test_check_instructions_reports_every_failing_case(tmp_path):
     import json
     from pathlib import Path
 
-    from metta_benchmarking import BenchmarkBaseline
-
     from benchmarks.check_instructions import observe_all
+    from metta_benchmarking import BenchmarkBaseline
 
     real = json.loads(
         (Path(__file__).resolve().parents[3] / "benchmarks" / "baseline.json")
