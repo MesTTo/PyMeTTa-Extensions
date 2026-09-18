@@ -12,6 +12,12 @@ rows.
 pip install metta-pandas          # or: pip install 'pymetta[dataframes]'
 ```
 
+The frame row declares pandas' native `itertuples(index=False)` extraction.
+`frame.metta.into(space, "row")` reads and writes the whole frame in one
+transaction. Foreign stores require transactional writes; nested ingestion
+also requires provider savepoints. Input and cleanup failures roll back the
+load before its transaction commits.
+
 Its tests are in `tests/`, and they run in the workspace suite:
 
 ```sh

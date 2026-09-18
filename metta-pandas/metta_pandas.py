@@ -15,6 +15,10 @@ Assumes:
   - pandas is importable when a frame is actually BUILT; the row itself holds
     the module NAME and imports nothing, so `import metta._spaces.results` stays free
 Guarantees:
+  - frame ingestion declares pandas' native row iterator, `tables.add` calls it
+    for a frame, and unrelated inputs stay unclaimed [tested:
+    tests/test_pandas.py::test_frame_rows_use_the_declared_native_extractor;
+    commit=179bcf460e69f3f7e05683027983a063df0b482e]
   - namespace and short conversion methods come from door contracts; the
     frame row owns the builder and library accessor [tested:
     tests/test_pandas.py::test_the_row_is_registered_against_the_frame_point,
@@ -33,6 +37,8 @@ Open Obligations:
 
 from __future__ import annotations
 
+import sys
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any, Final
 
 import metta.doors as _doors
@@ -52,6 +58,14 @@ require_module = seam.at("module").call()
 def _install_accessor(pandas: Any, name: str, door: type) -> None:
     """`df.<name>` on a pandas frame: its registered accessor."""
     pandas.api.extensions.register_dataframe_accessor(name)(door)
+
+
+def _rows(source: Any) -> Iterator[Any] | None:
+    """Read an already imported pandas frame through its native row iterator."""
+    pandas = sys.modules.get("pandas")
+    if pandas is not None and isinstance(source, pandas.DataFrame):
+        return source.itertuples(index=False)
+    return None
 
 
 def _build(source: Any, projection: Any, view: Any) -> Any:
@@ -134,6 +148,7 @@ def register() -> None:
         module="pandas",
         accessor=_install_accessor,
         build=_build,
+        rows=_rows,
     )
 
 
