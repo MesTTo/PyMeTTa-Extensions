@@ -569,10 +569,10 @@ class BenchmarkBaseline:
         across a re-take because their point-count assertion failed first at
         every measured point [measured 2026-09-19: 0 slope findings at every
         ladder point and 2 on the tree that re-pinned the counts;
-        commit=WORKTREE]. Inside this block a failed comparison is recorded and
+        commit=e81e5369ecce854c09c75113cf1ca30e76d06154]. Inside this block a failed comparison is recorded and
         answers None, and one AssertionError carrying every finding is raised
         when the block ends [tested: test_collecting_reports_every_finding;
-        commit=WORKTREE].
+        commit=e81e5369ecce854c09c75113cf1ca30e76d06154].
         """
         if self._findings is not None:
             msg = "collecting() blocks do not nest"
