@@ -97,7 +97,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -505,6 +505,9 @@ class BenchmarkBaseline:
         # rule. Declared policies are written on every update, unlike a per-row
         # noise band, because prose is authored and a band is measured.
         self.policies = dict(_DEFAULT_POLICIES | dict(policies or {}))
+        # Inside a collecting() block a failed comparison is recorded here and the
+        # next comparison still runs; outside one it raises where it fails.
+        self._findings: list[str] | None = None
         if not self.path.is_file():
             if not update:
                 msg = f"benchmark baseline does not exist: {self.path}"
@@ -555,6 +558,43 @@ class BenchmarkBaseline:
             f"depth {pinned.get('depth', 'unspecified')}; {reason}"
         )
 
+    @contextmanager
+    def collecting(self):
+        """Every comparison inside the block reaches the log.
+
+        A test that pins two things about one row, its count and its slope, or a
+        tool that holds every tier of a table to a pin, used to stop at the first
+        comparison that failed, so the second was never read: the direct-join
+        and prepared-join slopes and the extension add-atom tier sat stale
+        across a re-take because their point-count assertion failed first at
+        every measured point [measured 2026-09-19: 0 slope findings at every
+        ladder point and 2 on the tree that re-pinned the counts;
+        commit=WORKTREE]. Inside this block a failed comparison is recorded and
+        answers None, and one AssertionError carrying every finding is raised
+        when the block ends [tested: test_collecting_reports_every_finding;
+        commit=WORKTREE].
+        """
+        if self._findings is not None:
+            msg = "collecting() blocks do not nest"
+            raise RuntimeError(msg)
+        self._findings = []
+        try:
+            yield
+        finally:
+            findings, self._findings = self._findings, None
+        if findings:
+            raise AssertionError("\n".join(findings))
+
+    def _verdict(self, compare: Callable[[], Any]) -> Any:
+        """Run one comparison: inside collecting() a failure is recorded and answers None."""
+        if self._findings is None:
+            return compare()
+        try:
+            return compare()
+        except AssertionError as failure:
+            self._findings.append(str(failure))
+            return None
+
     def observe_counter(
         self,
         name: str,
@@ -583,7 +623,7 @@ class BenchmarkBaseline:
             return observed
 
         expected = self._case(name, unit=unit, operations=operations)
-        return _compare_counter(name, expected, sample_values, observed)
+        return self._verdict(lambda: _compare_counter(name, expected, sample_values, observed))
 
     def observe_counter_slope(
         self,
@@ -611,7 +651,7 @@ class BenchmarkBaseline:
                 "delta_inferences": observed,
             }
             return observed
-        return _compare_counter_slope(
+        return self._verdict(lambda: _compare_counter_slope(
             name,
             case.get("inference_slope"),
             small_operations=small_operations,
@@ -619,7 +659,7 @@ class BenchmarkBaseline:
             small_values=small_values,
             large_values=large_values,
             observed=observed,
-        )
+        ))
 
     def remove_case(self, name: str) -> None:
         """Drop a pinned case during an update, for rows nothing measures.
@@ -722,7 +762,7 @@ class BenchmarkBaseline:
 
     def observe_measurement(
         self, name: str, metric: Metric, samples: Sequence[float]
-    ) -> float:
+    ) -> float | None:
         """Record or compare one percent-banded counter beside its band.
 
         The count is measured; the noise band beside it is DECLARED, so an
@@ -741,14 +781,18 @@ class BenchmarkBaseline:
             case.setdefault(metric.band_key, metric.default_percent)
             return observed
 
-        if case is None:
-            msg = f"benchmark baseline has no case named {name!r}"
-            raise AssertionError(msg)
-        return _compare_measurement(name, metric, case, samples, observed)
+        def compared() -> float:
+            if case is None:
+                msg = f"benchmark baseline has no case named {name!r}"
+                raise AssertionError(msg)
+            return _compare_measurement(name, metric, case, samples, observed)
 
-    def observe_instructions(self, name: str, samples: Sequence[int]) -> int:
-        """Record or compare perf's retired-instruction counter."""
-        return int(self.observe_measurement(name, INSTRUCTIONS, samples))
+        return self._verdict(compared)
+
+    def observe_instructions(self, name: str, samples: Sequence[int]) -> int | None:
+        """Record or compare perf's retired-instruction counter; None for a finding a collecting() block recorded."""
+        observed = self.observe_measurement(name, INSTRUCTIONS, samples)
+        return None if observed is None else int(observed)
 
     def finish(self) -> None:
         """Atomically write an update; normal comparison mode writes nothing."""

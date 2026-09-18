@@ -1262,3 +1262,28 @@ def test_a_baseline_compares_checkout_length_and_depth(tmp_path):
             encoding="utf-8",
         )
         assert BenchmarkBaseline(broken).checkout_path_refusal(checkout) is None
+
+
+def test_collecting_reports_every_finding(tmp_path):  # noqa: D103  -- pytest discovers or injects the fixture by name
+    path = tmp_path / "baseline.json"
+    pinned = BenchmarkBaseline(path, update=True)
+    pinned.observe_counter("count", unit="rows", operations=8, samples=[30, 30, 30])
+    pinned.observe_counter("other", unit="rows", operations=8, samples=[30, 30, 30])
+    pinned.finish()
+    baseline = BenchmarkBaseline(path)
+    # Outside a block the first failure raises where it is, as before.
+    with pytest.raises(AssertionError, match="count inference regression"):
+        baseline.observe_counter("count", unit="rows", operations=8, samples=[90, 90, 90])
+    # Inside one, both comparisons run, each answers None, and one error names both.
+    with pytest.raises(AssertionError) as failure, baseline.collecting():
+        first = baseline.observe_counter("count", unit="rows", operations=8, samples=[90, 90, 90])
+        second = baseline.observe_counter("other", unit="rows", operations=8, samples=[1, 1, 1])
+        assert first is None
+        assert second is None
+    assert "count inference regression" in str(failure.value)
+    assert "other inference improvement left unpinned" in str(failure.value)
+    # A block with no finding raises nothing and the comparison answers its value.
+    with baseline.collecting():
+        assert baseline.observe_counter("count", unit="rows", operations=8, samples=[30, 30, 30]) == 30
+    with pytest.raises(RuntimeError, match="do not nest"), baseline.collecting(), baseline.collecting():
+        pass
