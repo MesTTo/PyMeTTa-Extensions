@@ -820,15 +820,15 @@ def test_the_benchmark_suite_prices_a_file_load():
     the registry row, the runner function, and a live integer baseline.
     """  # noqa: D205  -- the scenario narrative is one continuous invariant, not summary-and-body prose
     import json
-    from pathlib import Path
 
-    root = Path(__file__).resolve().parents[5]
-    registry = (root / "extensions" / "python" / "bench.py").read_text()
+    from _workspace import SEAT
+
+    registry = (SEAT / "bench.py").read_text()
     assert '"file-load": "test_file_load"' in registry
-    suite = (root / "extensions" / "python" / "benchmarks" / "test_benchmarks.py").read_text()
+    suite = (SEAT / "benchmarks" / "test_benchmarks.py").read_text()
     assert "def test_file_load(" in suite
     data = json.loads(
-        (root / "extensions" / "python" / "benchmarks" / "baseline.json").read_text()
+        (SEAT / "benchmarks" / "baseline.json").read_text()
     )
     entry = data["benchmarks"]["file-load"]
     assert isinstance(entry["inferences"], int) and entry["inferences"] > 0
@@ -857,7 +857,6 @@ def test_the_json_wire_row_is_not_registered_engine_free():
     [measured 2026-08-28].
     """
     import json
-    from pathlib import Path
 
     from metta import MeTTa
 
@@ -878,12 +877,11 @@ def test_the_json_wire_row_is_not_registered_engine_free():
         "engine doing the work"
     )
 
-    root = Path(__file__).resolve().parents[5]
-    assert '"json-wire": "test_json_wire"' in (
-        root / "extensions" / "python" / "bench.py"
-    ).read_text()
+    from _workspace import SEAT
+
+    assert '"json-wire": "test_json_wire"' in (SEAT / "bench.py").read_text()
     entry = json.loads(
-        (root / "extensions" / "python" / "benchmarks" / "baseline.json").read_text()
+        (SEAT / "benchmarks" / "baseline.json").read_text()
     )["benchmarks"]["json-wire"]
     assert isinstance(entry["inferences"], int) and entry["inferences"] > 0
 
@@ -899,14 +897,14 @@ def test_check_instructions_reports_every_failing_case(tmp_path):
     reported, and the passing case's observation unharmed.
     """
     import json
-    from pathlib import Path
 
     from benchmarks.check_instructions import observe_all
     from metta_benchmarking import BenchmarkBaseline
 
+    from _workspace import SEAT
+
     real = json.loads(
-        (Path(__file__).resolve().parents[3] / "benchmarks" / "baseline.json")
-        .read_text()
+        (SEAT / "benchmarks" / "baseline.json").read_text()
     )
     document = {
         key: value for key, value in real.items() if key != "benchmarks"

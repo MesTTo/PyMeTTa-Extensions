@@ -14,8 +14,9 @@ import tomllib
 import zipfile
 from pathlib import Path
 
+from _workspace import ROOT
+
 PACKAGE = Path(__file__).resolve().parents[1]
-ROOT = PACKAGE.parents[3]
 sys.path.insert(0, str(ROOT / "tests/checks"))
 
 from bounded_spawn import bounded  # noqa: E402 -- repository process policy

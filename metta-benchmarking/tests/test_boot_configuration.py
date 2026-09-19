@@ -14,7 +14,8 @@ from types import SimpleNamespace
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[5]
+from _workspace import ROOT
+
 CANONICAL = Path('/aaaa/bbbb/cccc/dddd/eeeeeeee')
 
 

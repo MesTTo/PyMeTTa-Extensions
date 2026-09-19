@@ -22,8 +22,11 @@ if ! command -v run >/dev/null 2>&1; then
     exec sh "$EXT_HERE/../check.sh" "$@"
 fi
 
+# Paths are resolved through $HERE rather than left relative, because a lane must not
+# depend on which directory the gate happened to be in when it sourced this file, and
+# because the evidence gate models a lane's coverage by resolving exactly that prefix.
 # ruff walks up from each file for its configuration, so these read the repository's
 # own pyproject.toml exactly as the seat's files do.
-run GATE   ext-ruff        bounded "$PY" -m ruff check ext
-run GATE   ext-bandit      bounded "$PY" -m bandit -q -c pyproject.toml -r ext
-run GATE   ext-interrogate bounded "$PY" -m interrogate ext
+run GATE   ext-ruff        bounded "$PY" -m ruff check "$HERE/ext"
+run GATE   ext-bandit      bounded "$PY" -m bandit -q -c "$HERE/pyproject.toml" -r "$HERE/ext"
+run GATE   ext-interrogate bounded "$PY" -m interrogate "$HERE/ext"
