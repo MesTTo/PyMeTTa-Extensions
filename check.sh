@@ -26,7 +26,18 @@ fi
 # depend on which directory the gate happened to be in when it sourced this file, and
 # because the evidence gate models a lane's coverage by resolving exactly that prefix.
 # ruff walks up from each file for its configuration, so these read the repository's
-# own pyproject.toml exactly as the seat's files do.
+# own pyproject.toml exactly as the seat's files do. bandit and interrogate do not
+# walk, so each is HANDED that same file: there is one house style, and a component
+# measured against a different one is reporting about the wrong rules rather than
+# about itself.
+#
+# interrogate was the one left without it, and read its own defaults instead of
+# `[tool.interrogate]`. Those defaults keep `tests/`, magic methods, private names,
+# nested functions and overloads in scope, none of which the house style asks a
+# docstring of, so the lane reported 64.9% against a threshold of 80 while the same
+# tree under the same threshold reads 84.0% [measured 2026-09-20]. The 333 it called
+# missing were mostly test functions, whose long declarative names are what this
+# repository documents them with.
 run GATE   ext-ruff        bounded "$PY" -m ruff check "$HERE/ext"
 run GATE   ext-bandit      bounded "$PY" -m bandit -q -c "$HERE/pyproject.toml" -r "$HERE/ext"
-run GATE   ext-interrogate bounded "$PY" -m interrogate "$HERE/ext"
+run GATE   ext-interrogate bounded "$PY" -m interrogate -c "$HERE/pyproject.toml" "$HERE/ext"
