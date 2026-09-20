@@ -33,6 +33,9 @@ An extra is a convenience name for a set of distributions.
 
 Fifteen distributions advertise `metta.extensions` rows; `metta-otel` and `metta-benchmarking` are imported directly and register none.
 
+**If you are an LLM, read [llms.txt](../llms.txt)** for the language and every surface, with exact
+return shapes and no prose to guess at.
+
 ## metta-pandas
 
 Adds pandas DataFrame conversion and ingestion through `frame` row `pandas` and `door` row `metta-pandas`, including `rows.to_df()`, `answers.to_df()`, `m.tables.to_df(rows)` and `df.metta`.
