@@ -19,7 +19,7 @@ if ! command -v run >/dev/null 2>&1; then
     if [ "$#" -eq 0 ]; then
         set -- ext-ruff ext-bandit ext-interrogate
     fi
-    exec sh "$EXT_HERE/../check.sh" "$@"
+    exec sh "$EXT_HERE/../tools/check.sh" "$@"
 fi
 
 # Paths are resolved through $HERE rather than left relative, because a lane must not
