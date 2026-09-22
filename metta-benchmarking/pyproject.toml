@@ -23,6 +23,12 @@ dependencies = [
     "pymetta==0.8.0",
 ]
 classifiers = [
+    # Linux, not merely POSIX. The instruction-count path measures with
+    # `perf stat`, and perf_event_open is a Linux syscall with no macOS or
+    # Windows equivalent, so a portable spawn would not make the feature
+    # work. Declared rather than discovered: without this row pip installs
+    # the package anywhere and the first measurement raises AttributeError.
+    "Operating System :: POSIX :: Linux",
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
     "Intended Audience :: Science/Research",

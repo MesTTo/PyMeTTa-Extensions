@@ -1067,7 +1067,12 @@ LOAD_PER_CORE_CEILING = 1.0
 def load_per_core() -> float:
     """The one-minute load average divided by the cores that can serve it."""
     try:
-        return os.getloadavg()[0] / (os.cpu_count() or 1)
+        if sys.platform == "linux":
+            return os.getloadavg()[0] / (os.cpu_count() or 1)
+        # No load average outside Linux and macOS, and none at all on Windows:
+        # there is no such kernel statistic. Answering 0.0 says "nothing known
+        # about contention", which is what the caller does with a quiet box.
+        return 0.0
     except OSError:
         #A box that will not say is treated as quiet: refusing a measurement
         #because a counter could not be READ would turn an unrelated platform
@@ -1361,6 +1366,17 @@ def _run_perf(
             "--",
             *command,
         ]
+        if sys.platform != "linux":
+            # Refused here with the reason, rather than reached and raising
+            # AttributeError on os.POSIX_SPAWN_DUP2. `perf stat` measures
+            # through perf_event_open, a Linux syscall, so this path is
+            # Linux-only by WHAT IT MEASURES and not by how it spawns: making
+            # the spawn portable would leave nothing to run.
+            msg = (f"instruction counting needs `perf stat`, which measures "
+                   f"through perf_event_open, a Linux facility; this is "
+                   f"{sys.platform}. Wall-clock and inference counts work "
+                   f"everywhere, so gate on inferences here.")
+            raise RuntimeError(msg)
         file_actions = [
             (os.POSIX_SPAWN_DUP2, stdout.fileno(), 1),
             (os.POSIX_SPAWN_DUP2, stderr.fileno(), 2),
