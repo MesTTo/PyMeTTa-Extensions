@@ -16,10 +16,7 @@
 
 if ! command -v run >/dev/null 2>&1; then
     EXT_HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-    if [ "$#" -eq 0 ]; then
-        set -- ext-ruff ext-bandit ext-interrogate
-    fi
-    exec sh "$EXT_HERE/../tools/check.sh" "$@"
+    exec sh "$EXT_HERE/../tools/check.sh" --component ext "$@"
 fi
 
 # Paths are resolved through $HERE rather than left relative, because a lane must not
@@ -41,3 +38,27 @@ fi
 run GATE   ext-ruff        bounded "$PY" -m ruff check "$HERE/ext"
 run GATE   ext-bandit      bounded "$PY" -m bandit -q -c "$HERE/pyproject.toml" -r "$HERE/ext"
 run GATE   ext-interrogate bounded "$PY" -m interrogate -c "$HERE/pyproject.toml" "$HERE/ext"
+
+# These lanes belong to this component even when their checkers live in tests/checks.
+# The host wheel is built from a swipl-devel tree this repository fetches and
+# patches itself, and two of the nineteen patches target a SUBMODULE of it.
+# A router that tried only the superproject would apply seventeen and refuse
+# two, which builds a host missing fixes rather than failing. This plants its
+# own trees, so it needs no clone and no network.
+# Owner: ext; this lane checks only this component.
+run GATE fetch-source-selftest sh "$HERE/tools/pymetta-host/fetch_selftest.sh"
+
+# A wheel cannot carry a symlink, so every alias in a staged tree reaches the
+# user as a full copy, and a copy of a position-dependent ELF carries an RPATH
+# for a directory it is no longer in. That shipped: pymetta-host imported
+# cleanly, answered 6*7=42 and reported SWI 10.1.14 in the same install whose
+# bin/swipl could not start and whose libswipl borrowed libgmp from the host.
+# An import-level test sees none of it, so this reads the dynamic section of
+# every shipped ELF instead. The wheels are a build artefact rather than a
+# repository one, so with none present the lane is vacuously true and
+# assemble.sh is what gates the ones it builds.
+# Owner: ext; this lane checks only this component.
+run GATE host-bundle "$PY" "$HERE/tests/checks/check_host_bundle.py" \
+    $(ls "$HERE"/ext/pymetta-host/dist/*.whl 2>/dev/null)
+# Owner: ext; this lane checks only this component.
+run GATE host-bundle-selftest "$PY" "$HERE/tests/checks/check_host_bundle_selftest.py"
