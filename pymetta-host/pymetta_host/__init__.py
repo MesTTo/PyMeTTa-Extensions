@@ -1,5 +1,6 @@
-"""Purpose: carry the SWI-Prolog host PyMeTTa's engine needs, so a user does
-not have to build one.
+"""Purpose: carry the SWI-Prolog host PyMeTTa's engine needs.
+
+A user does not have to build one.
 
 PyMeTTa's engine runs on a PATCHED SWI. `docs/host-workarounds.md` in the
 MeTTa repository records sixty host defects and the twenty-two we carry a
@@ -63,10 +64,12 @@ def _launcher() -> Path:
     """
     found = next((SWI_HOME / "bin").glob("*/swipl"), None)
     if found is None:
-        raise RuntimeError(
+        msg = (
             f"no launcher under {SWI_HOME / 'bin'}: this package's home is "
             f"incomplete, which a wheel should make impossible. Reinstall "
-            f"pymetta-host.")
+            f"pymetta-host."
+        )
+        raise RuntimeError(msg)
     return found
 
 
@@ -98,24 +101,28 @@ def activate() -> Path:
     if loaded is not None:
         where = Path(getattr(loaded, "__file__", "") or "").resolve()
         if _VENDOR not in where.parents:
-            raise RuntimeError(
+            msg = (
                 f"janus_swi was already imported from {where or 'an unknown location'}, "
                 f"and it was not the bridge this package carries. Pointing the bundled "
                 f"home at another build's bridge is an ABI mismatch that fails later and "
                 f"elsewhere, so it is refused here instead. Either import pymetta_host "
                 f"before anything imports janus_swi, or uninstall janus_swi and let this "
-                f"package supply it.")
+                f"package supply it."
+            )
+            raise RuntimeError(msg)
 
     chosen = os.environ.get("SWI_HOME_DIR")
     if chosen is not None and Path(chosen).resolve() != SWI_HOME:
-        raise RuntimeError(
+        msg = (
             f"SWI_HOME_DIR names {chosen}, and this package carries its own host at "
             f"{SWI_HOME}. The bridge and the home are one build: activate() would put "
             f"the bundled bridge on sys.path while that home answered its calls, which "
             f"is the same ABI mismatch as importing a foreign bridge, and it surfaces "
             f"as a crash with nothing pointing back here. Unset SWI_HOME_DIR to use the "
             f"bundled host, or do not call activate() and let your own host and bridge "
-            f"pair up.")
+            f"pair up."
+        )
+        raise RuntimeError(msg)
 
     if loaded is None:
         os.environ["SWI_HOME_DIR"] = str(SWI_HOME)

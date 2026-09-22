@@ -1,5 +1,6 @@
-"""Purpose: declare this wheel impure, so it carries an interpreter tag and a
-platform tag.
+"""Purpose: declare this wheel impure.
+
+An impure wheel carries an interpreter tag and a platform tag.
 
 The vendored bridge is an extension module built against one interpreter's ABI
 and one platform's libc, and the SWI home is an ELF tree for one architecture,
