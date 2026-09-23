@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pymetta-host"
-version = "0.9.0"
+version = "0.9.1"
 description = "The patched SWI-Prolog host PyMeTTa's engine runs on, bundled"
 readme = "README.md"
 requires-python = ">=3.12"

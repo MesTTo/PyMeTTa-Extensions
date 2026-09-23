@@ -45,7 +45,7 @@ import os
 import sys
 from pathlib import Path
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 
 _HERE = Path(__file__).resolve().parent
 
