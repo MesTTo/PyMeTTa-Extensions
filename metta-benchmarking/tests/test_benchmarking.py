@@ -16,11 +16,13 @@ Open Obligations:
   Future Enhancements: None.
 """  # noqa: D205  -- the scenario narrative is one continuous invariant, not summary-and-body prose
 
+import gc
 import json
 import os
 import signal
+import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 from bench import CASES, _write_merged_json
@@ -544,6 +546,91 @@ def test_perf_workload_setup_and_teardown_stay_outside_control(monkeypatch):  # 
 
     assert perf_workload_main(["probe", "--controlled"]) == 0
     assert events == ["setup", "enable", "operation", "disable", "teardown"]
+
+
+def test_the_controlled_window_holds_the_cyclic_collector_off(monkeypatch):
+    """No collection pass can land inside the window, and the collector comes back.
+
+    A pass fires on allocation thresholds, so whether one lands in the window
+    depends on the whole process's allocation history rather than on the
+    operation: that flipped save-load-metta by 8.9 percent on a never-called
+    block of code. The window runs with the collector off and restores exactly
+    the state it found, and it does not collect first: a pass before the window
+    rearranges the free lists the operation allocates from, which moved a
+    Python-only workload by 1.8 percent.
+    """
+    from benchmarks.pure import _controlled
+
+    control_read, control_write = os.pipe()
+    ack_read, ack_write = os.pipe()
+    spare_read, spare_write = os.pipe()
+    # perf answers each command once, so the enable's ack is ready before the
+    # window opens and the disable's is written from inside it.
+    os.write(ack_write, b"ack\n")
+    monkeypatch.setenv("METTA_PERF_CONTROL_FD", str(control_write))
+    monkeypatch.setenv("METTA_PERF_ACK_FD", str(ack_read))
+    monkeypatch.setenv("METTA_PERF_CLOSE_FDS", str(spare_read))
+    seen = {}
+
+    def operation():
+        seen["enabled"] = gc.isenabled()
+        seen["collections"] = [entry["collections"] for entry in gc.get_stats()]
+        os.write(ack_write, b"ack\n")
+        return 1
+
+    was_enabled = gc.isenabled()
+    before = [entry["collections"] for entry in gc.get_stats()]
+    try:
+        assert _controlled(operation) == 1
+        assert os.read(control_read, 64) == b"enable\ndisable\n"
+    finally:
+        for descriptor in (control_read, control_write, ack_read, ack_write, spare_write):
+            os.close(descriptor)
+    assert seen["enabled"] is False
+    assert seen["collections"] == before
+    assert gc.isenabled() is was_enabled
+
+
+
+def test_the_controlled_window_holds_the_prolog_gc_thread_off(monkeypatch):
+    """SWI's gc thread is stopped for the window and started again after it.
+
+    Its work finished inside the window or after it by thread schedule alone,
+    so save-load-metta's samples spread 1.5 percent with it and 0.011 percent
+    without it. A workload that never booted SWI is left alone, since
+    importing janus_swi to ask would boot it.
+    """
+    from benchmarks.pure import _controlled
+
+    events = []
+    prolog = ModuleType("janus_swi")
+    prolog.query_once = lambda _goal: {"Mode": "true"}
+    prolog.cmd = lambda _module, predicate, mode: events.append((predicate, mode))
+    control_read, control_write = os.pipe()
+    ack_read, ack_write = os.pipe()
+    spare_read, spare_write = os.pipe()
+    os.write(ack_write, b"ack\n")
+    monkeypatch.setenv("METTA_PERF_CONTROL_FD", str(control_write))
+    monkeypatch.setenv("METTA_PERF_ACK_FD", str(ack_read))
+    monkeypatch.setenv("METTA_PERF_CLOSE_FDS", str(spare_read))
+    monkeypatch.setitem(sys.modules, "janus_swi", prolog)
+
+    def operation():
+        events.append("operation")
+        os.write(ack_write, b"ack\n")
+        return 1
+
+    try:
+        assert _controlled(operation) == 1
+    finally:
+        for descriptor in (control_read, control_write, ack_read, ack_write, spare_write):
+            os.close(descriptor)
+    assert events == [
+        ("set_prolog_gc_thread", "false"),
+        "operation",
+        ("set_prolog_gc_thread", "true"),
+    ]
+
 
 
 def test_perf_workload_teardown_runs_after_failure(monkeypatch):  # noqa: D103  -- pytest discovers or injects this callable; its descriptive name states the contract
