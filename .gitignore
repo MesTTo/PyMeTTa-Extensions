@@ -12,16 +12,6 @@ __pycache__/
 */build/
 */*.egg-info/
 
-# pymetta-host's package data is BUILT, not source: a patched SWI-Prolog home
-# of about 1,200 files and the janus bridge vendored beside it, staged by
-# tools/pymetta-host/run.sh in the superproject. assemble.sh copies the package
-# sources elsewhere and builds there, so these should never appear here; they
-# are ignored because an interrupted in-place build once left 2,404 of those
-# files in the tree, 21 of them Python, and every Python tool in the gate
-# walked into swiplserver and SWI's own protobuf examples.
-pymetta-host/pymetta_host/swipl/
-pymetta-host/pymetta_host/_vendor/
-
 # `python -m build`'s output, beside a distribution's source for the same
 # reason its scratch directory above is.
 */dist/

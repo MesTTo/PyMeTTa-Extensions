@@ -50,15 +50,16 @@ run GATE fetch-source-selftest sh "$HERE/tools/pymetta-host/fetch_selftest.sh"
 
 # A wheel cannot carry a symlink, so every alias in a staged tree reaches the
 # user as a full copy, and a copy of a position-dependent ELF carries an RPATH
-# for a directory it is no longer in. That shipped: pymetta-host imported
-# cleanly, answered 6*7=42 and reported SWI 10.1.14 in the same install whose
-# bin/swipl could not start and whose libswipl borrowed libgmp from the host.
-# An import-level test sees none of it, so this reads the dynamic section of
-# every shipped ELF instead. The wheels are a build artefact rather than a
-# repository one, so with none present the lane is vacuously true and
-# assemble.sh is what gates the ones it builds.
+# for a directory it is no longer in. That shipped once: the host wheel then
+# built as its own distribution imported cleanly, answered 6*7=42 and reported
+# SWI 10.1.14 in the same install whose bin/swipl could not start and whose
+# libswipl borrowed libgmp from the host. An import-level test sees none of
+# it, so this reads the dynamic section of every shipped ELF instead, in the
+# pymetta manylinux wheels tools/pymetta-host/run.sh grafts the host into.
+# They are a build artefact rather than a repository one, so with none present
+# the lane is vacuously true and assemble.sh is what gates the ones it builds.
 # Owner: ext; this lane checks only this component.
 run GATE host-bundle "$PY" "$HERE/tests/checks/check_host_bundle.py" \
-    $(ls "$HERE"/ext/pymetta-host/dist/*.whl 2>/dev/null)
+    $(ls "$HERE"/ai-tmp/host-build/dist/pymetta-*-manylinux*.whl 2>/dev/null)
 # Owner: ext; this lane checks only this component.
 run GATE host-bundle-selftest "$PY" "$HERE/tests/checks/check_host_bundle_selftest.py"
