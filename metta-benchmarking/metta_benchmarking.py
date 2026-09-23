@@ -50,6 +50,12 @@ Guarantees:
     a unit-carrying event reads beside a bare one, and it hands back each
     run's own standard output so a workload can report a counter perf cannot
     see [tested test_measure_counters_reads_every_requested_event]
+  - a counting tool starts the workload the measurement environment's PATH
+    names, resolved before the tool runs, because perf puts its own
+    directories ahead of the PATH it passes on [tested:
+    test_a_counting_tool_starts_the_workload_the_measurement_path_names,
+    test_cachegrind_starts_the_workload_the_measurement_path_names;
+    commit=WORKTREE]
   - an instruction pin and an estimated-cycle pin are ONE mechanism under two
     Metric declarations, so a counter that crosses a foreign boundary is gated
     on both, which is the only safe reading there: foreign code retires no
@@ -1292,6 +1298,30 @@ def measure_instructions(
     return tuple(int(value) for value in runs.events["instructions:u"])
 
 
+def _workload(command: Sequence[str], environment: Mapping[str, str]) -> list[str]:
+    """The measured command, its executable resolved against the measurement PATH.
+
+    A counting tool starts the workload itself, and perf puts its own
+    directories AHEAD of the PATH it was handed before it does
+    (tools/perf/util/exec-cmd.c, setup_path: perf's exec path, then the
+    directory perf ran from, then PATH), so a bare name resolves in /usr/bin
+    whatever the measurement environment says. Every `swipl` the engine
+    benchmark counted therefore ran the stock build rather than the patched one
+    first on PATH, silently until the engine's host check began refusing that
+    pairing [measured 2026-09-24: `perf stat -- sh -c 'echo $PATH'` printed
+    /usr/libexec/perf-core:/usr/bin: ahead of the PATH it was given, and
+    `perf stat -- swipl` reported the stock build's compiled_at with the
+    patched swipl first on PATH]. Resolved here, once, for every tool, the
+    workload is the one the measurement environment names; a name that PATH
+    does not hold is refused rather than left for the tool to find elsewhere.
+    """
+    resolved = shutil.which(command[0], path=environment.get("PATH", os.defpath))
+    if resolved is None:
+        msg = f"{command[0]} is not on the measurement environment's PATH"
+        raise FileNotFoundError(msg)
+    return [resolved, *command[1:]]
+
+
 def _run_perf(
     command: Sequence[str],
     environment: Mapping[str, str],
@@ -1360,7 +1390,7 @@ def _run_perf(
         *event_arguments,
         *control_arguments,
         "--",
-        *command,
+        *_workload(command, child_environment),
     ]
     return _spawn_and_reap(
         argv,
@@ -1527,7 +1557,7 @@ def _run_cachegrind(
             *_SIMULATED_CACHES,
             f"--instr-at-start={'no' if controlled else 'yes'}",
             f"--cachegrind-out-file={output}",
-            *command,
+            *_workload(command, environment),
         ]
         returncode, stdout, stderr = _spawn_and_reap(
             argv, environment, timeout=timeout, what="cachegrind"

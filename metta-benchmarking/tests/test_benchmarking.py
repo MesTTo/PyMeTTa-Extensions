@@ -23,6 +23,7 @@ Open Obligations:
 import gc
 import json
 import os
+import shutil
 import signal
 import sys
 from pathlib import Path
@@ -57,6 +58,7 @@ from metta_benchmarking import (
     PERF_CONTROL_REFUSED,
     BenchmarkBaseline,
     MeasurementRefusedError,
+    _run_cachegrind,
     _run_perf,
     _spawn_and_reap,
     benchmark_case,
@@ -578,7 +580,7 @@ def test_perf_timeout_kills_and_reaps_process_group(monkeypatch):  # noqa: D103 
     # This test substitutes the whole act of running a process; the tools it
     # would have run are part of that, and requiring them installed would make
     # a timeout-and-reap test depend on the machine having perf.
-    monkeypatch.setattr("metta_benchmarking.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("metta_benchmarking.shutil.which", lambda name, path=None: f"/usr/bin/{name}")
     monkeypatch.setattr("metta_benchmarking.os.access", lambda _path, _mode: True)
 
     def waitpid(process, options):
@@ -600,6 +602,68 @@ def test_perf_timeout_kills_and_reaps_process_group(monkeypatch):  # noqa: D103 
         )
     assert killed == [(42, signal.SIGKILL)]
     assert waits == [(42, os.WNOHANG), (42, 0)]
+
+
+def _shadowing_workload(directory: Path) -> Path:
+    """An executable named like one /usr/bin also holds, in a directory of its own."""
+    directory.mkdir()
+    workload = directory / "true"
+    workload.write_text("#!/bin/sh\n", encoding="utf-8")
+    workload.chmod(0o755)
+    return workload
+
+
+def _tools_present(monkeypatch):
+    """perf, valgrind and setarch answer as installed; any other name resolves for real."""
+    resolve = shutil.which
+    monkeypatch.setattr(
+        "metta_benchmarking.shutil.which",
+        lambda name, path=None: f"/usr/bin/{name}" if name in {"perf", "valgrind"} else resolve(name, path=path),
+    )
+    monkeypatch.setattr("metta_benchmarking.os.access", lambda _path, _mode: True)
+
+
+def test_a_counting_tool_starts_the_workload_the_measurement_path_names(monkeypatch, tmp_path):
+    """perf is handed the workload ABSOLUTE, as the measurement PATH resolves it.
+
+    perf puts its own directories ahead of the PATH it passes to the workload,
+    so a bare `true` would start /usr/bin/true whatever the measurement
+    environment's first directory holds.
+    """
+    workload = _shadowing_workload(tmp_path / "bin")
+    _tools_present(monkeypatch)
+    started = []
+
+    def spawn(argv, _environment, **_keywords):
+        started.append(list(argv))
+        return 0, "", "1,,instructions:u,1,100.00,,\n"
+
+    monkeypatch.setattr("metta_benchmarking._spawn_and_reap", spawn)
+    _run_perf(["true", "--flag"], {"PATH": f"{workload.parent}{os.pathsep}/usr/bin"},
+              controlled=False, timeout=1.0, events=("instructions:u",))
+    assert started[0][started[0].index("--") + 1:] == [str(workload), "--flag"]
+    with pytest.raises(FileNotFoundError, match="not on the measurement environment's PATH"):
+        _run_perf(["no-such-workload"], {"PATH": str(workload.parent)},
+                  controlled=False, timeout=1.0, events=("instructions:u",))
+
+
+def test_cachegrind_starts_the_workload_the_measurement_path_names(monkeypatch, tmp_path):
+    """Cachegrind is handed the same resolved workload, one rule for every tool."""
+    workload = _shadowing_workload(tmp_path / "bin")
+    _tools_present(monkeypatch)
+    started = []
+
+    def spawn(argv, _environment, **_keywords):
+        started.append(list(argv))
+        out = next(word.split("=", 1)[1] for word in argv if word.startswith("--cachegrind-out-file="))
+        Path(out).write_text("events: Ir I1mr ILmr Dr D1mr DLmr Dw D1mw DLmw\n"
+                             "summary: 9 1 1 3 1 1 2 1 1\n", encoding="utf-8")
+        return 0, "", ""
+
+    monkeypatch.setattr("metta_benchmarking._spawn_and_reap", spawn)
+    _run_cachegrind("/usr/bin/valgrind", ["true", "--flag"],
+                    {"PATH": f"{workload.parent}{os.pathsep}/usr/bin"}, controlled=False, timeout=1.0)
+    assert started[0][-2:] == [str(workload), "--flag"]
 
 
 def test_perf_acknowledgement_accepts_the_native_nul_terminator():  # noqa: D103  -- pytest discovers or injects this callable; its descriptive name states the contract
