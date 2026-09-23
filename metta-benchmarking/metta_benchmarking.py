@@ -55,7 +55,7 @@ Guarantees:
     directories ahead of the PATH it passes on [tested:
     test_a_counting_tool_starts_the_workload_the_measurement_path_names,
     test_cachegrind_starts_the_workload_the_measurement_path_names;
-    commit=WORKTREE]
+    commit=310b6a9a2da78cf14d3cbc2919cc1eb88b05f096]
   - an instruction pin and an estimated-cycle pin are ONE mechanism under two
     Metric declarations, so a counter that crosses a foreign boundary is gated
     on both, which is the only safe reading there: foreign code retires no
