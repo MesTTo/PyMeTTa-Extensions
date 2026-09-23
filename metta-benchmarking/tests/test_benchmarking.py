@@ -10,6 +10,10 @@ Guarantees:
     rather than skip [tested:
     test_handle_benchmark_reaches_the_built_chapter_19_library;
     commit=49cb09f7a208810c81ef4ca78b608ca85f32af96]
+  - counted measurement refuses off Linux with the reason and spawns nothing:
+    perf for what it measures, and the spawner on Windows for the process
+    group it needs [tested: test_perf_refuses_off_linux_before_it_spawns,
+    test_the_spawner_refuses_windows_before_it_spawns; commit=WORKTREE]
 Open Obligations:
   To Do: None
   Hacks: None
@@ -54,6 +58,7 @@ from metta_benchmarking import (
     BenchmarkBaseline,
     MeasurementRefusedError,
     _run_perf,
+    _spawn_and_reap,
     benchmark_case,
     benchmark_counter_slope,
     count_atoms,
@@ -1437,3 +1442,26 @@ def test_collecting_reports_every_finding(tmp_path):  # noqa: D103  -- pytest di
         assert baseline.observe_counter("count", unit="rows", operations=8, samples=[30, 30, 30]) == 30
     with pytest.raises(RuntimeError, match="do not nest"), baseline.collecting(), baseline.collecting():
         pass
+
+
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+def test_perf_refuses_off_linux_before_it_spawns(monkeypatch, platform):
+    """perf_event_open is Linux's, so perf is refused elsewhere with that reason and nothing starts."""
+    spawned = []
+    monkeypatch.setattr("metta_benchmarking.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("metta_benchmarking.os.access", lambda _path, _mode: True)
+    monkeypatch.setattr("metta_benchmarking._spawn_and_reap", lambda *args, **_options: spawned.append(args))
+    monkeypatch.setattr("metta_benchmarking.sys.platform", platform)
+    with pytest.raises(RuntimeError, match="perf_event_open, a Linux facility"):
+        _run_perf(["true"], {}, controlled=False, timeout=5.0)
+    assert spawned == []
+
+
+def test_the_spawner_refuses_windows_before_it_spawns(monkeypatch):
+    """A timeout kills the child's whole process group, which Windows lacks, so it refuses first."""
+    spawned = []
+    monkeypatch.setattr("metta_benchmarking.os.posix_spawn", lambda *args, **_options: spawned.append(args))
+    monkeypatch.setattr("metta_benchmarking.sys.platform", "win32")
+    with pytest.raises(RuntimeError, match="Windows has no process groups"):
+        _spawn_and_reap(["true"], {}, timeout=5.0, what="cachegrind")
+    assert spawned == []

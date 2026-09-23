@@ -1384,8 +1384,19 @@ def _spawn_and_reap(
     `inherited` are descriptors the child was meant to receive, closed here
     once it has them. On a timeout or an interruption the whole group is
     killed and the child reaped, so no measured process outlives the harness
-    that started it.
+    that started it. That needs POSIX process groups, so Windows is refused
+    before anything spawns.
     """
+    if sys.platform == "win32":
+        # Both callers refuse first, for what they measure: perf and
+        # Cachegrind under setarch run on Linux alone. This is the spawner's
+        # own requirement, stated where it is used, so a later caller meets
+        # a reason rather than an AttributeError on os.posix_spawn.
+        msg = (f"{what} runs in a process group of its own so a timeout can "
+               f"kill it whole, and Windows has no process groups; counted "
+               f"measurement needs Linux. Wall-clock and inference counts "
+               f"work everywhere.")
+        raise RuntimeError(msg)
     with (
         tempfile.TemporaryFile() as stdout,
         tempfile.TemporaryFile() as stderr,
