@@ -49,8 +49,7 @@ from benchmarks.subscription import (
 )
 from benchmarks.workloads import json_payload, json_wire, term_operators, wire_atom, wire_codec
 from metta_benchmarking import (
-    CPU_SECONDS,
-    LOAD_PER_CORE_CEILING,
+    ESTIMATED_CYCLES,
     PERF_CONTROL_REFUSED,
     BenchmarkBaseline,
     MeasurementRefusedError,
@@ -58,12 +57,12 @@ from metta_benchmarking import (
     benchmark_case,
     benchmark_counter_slope,
     count_atoms,
-    load_per_core,
+    estimated_cycles,
     measure_counters,
     measure_instructions,
+    measure_simulated,
     measured_main,
     refusal_is_fatal,
-    time_is_measurable,
 )
 
 from metta import S
@@ -456,29 +455,114 @@ def test_a_declared_policy_is_written_on_every_update(tmp_path):
     assert "instructions:u minimum of three" in written["instruction_policy"]
 
 
-def test_a_cpu_time_pin_bands_on_both_sides(tmp_path):
-    """CPU seconds gate the same way instructions do, with their own band.
+def test_an_estimated_cycle_pin_bands_on_both_sides(tmp_path):
+    """Estimated cycles gate the same way instructions do, with their own band.
 
-    Both directions fail: a slower run is the regression, and a faster one is
-    a stale pin, which is what a foreign boundary needs because the inference
-    counter is blind there and cannot referee either direction.
+    Both directions fail: a costlier run is the regression, and a cheaper one
+    is a stale pin, which is what a foreign boundary needs because the
+    inference counter is blind there and cannot referee either direction.
     """
     path = tmp_path / "baseline.json"
     updating = BenchmarkBaseline(path, update=True)
-    updating.observe_counter("c-boot", unit="boots", operations=1, samples=None)
-    updating.observe_measurement("c-boot", CPU_SECONDS, [0.400, 0.410, 0.420])
+    updating.observe_counter("c-step", unit="steps", operations=1, samples=None)
+    updating.observe_measurement("c-step", ESTIMATED_CYCLES, [1000, 1004, 1009])
     updating.finish()
 
-    stored = json.loads(path.read_text())["benchmarks"]["c-boot"]
-    assert stored["cpu_seconds"] == 0.400
-    assert stored["cpu_noise_percent"] == 10.0
+    stored = json.loads(path.read_text())["benchmarks"]["c-step"]
+    assert stored["estimated_cycles"] == 1000
+    assert stored["estimated_cycles_noise_percent"] == 1.0
 
     baseline = BenchmarkBaseline(path)
-    assert baseline.observe_measurement("c-boot", CPU_SECONDS, [0.43, 0.44, 0.44]) == 0.43
-    with pytest.raises(AssertionError, match="CPU time regression"):
-        baseline.observe_measurement("c-boot", CPU_SECONDS, [0.441, 0.45, 0.46])
-    with pytest.raises(AssertionError, match="CPU time improvement left unpinned"):
-        baseline.observe_measurement("c-boot", CPU_SECONDS, [0.359, 0.36, 0.37])
+    assert baseline.observe_measurement("c-step", ESTIMATED_CYCLES, [1010, 1011, 1012]) == 1010
+    with pytest.raises(AssertionError, match="estimated cycle regression"):
+        baseline.observe_measurement("c-step", ESTIMATED_CYCLES, [1011, 1012, 1013])
+    with pytest.raises(AssertionError, match="estimated cycle improvement left unpinned"):
+        baseline.observe_measurement("c-step", ESTIMATED_CYCLES, [989, 990, 991])
+    # A count is whole: a fractional sample is a caller's defect, not a reading.
+    with pytest.raises(ValueError, match="invalid estimated cycle samples"):
+        baseline.observe_measurement("c-step", ESTIMATED_CYCLES, [1000.5, 1001, 1002])
+
+
+def test_estimated_cycles_prices_each_access_by_the_level_that_served_it():
+    """One for a first-level hit, five for a last-level hit, thirty-five for memory.
+
+    Twenty accesses that all hit cost twenty; one first-level miss the last
+    level caught adds four; one that went on to memory adds thirty-four. The
+    last case is a real windowed run of the C seat's term-out, whose summary
+    line reads these nine counts.
+    """
+    hits = {"Ir": 10, "I1mr": 0, "ILmr": 0, "Dr": 5, "D1mr": 0, "DLmr": 0,
+            "Dw": 5, "D1mw": 0, "DLmw": 0}
+    assert estimated_cycles(hits) == 20
+    assert estimated_cycles(hits | {"I1mr": 1}) == 24
+    assert estimated_cycles(hits | {"D1mw": 1, "DLmw": 1}) == 54
+    term_out = dict(zip(
+        ("Ir", "I1mr", "ILmr", "Dr", "D1mr", "DLmr", "Dw", "D1mw", "DLmw"),
+        (652218324, 5050396, 1491, 100821057, 2610687, 2217, 340254838, 2497564, 560),
+        strict=True,
+    ))
+    assert estimated_cycles(term_out) == 1134056847
+
+
+def _fake_cachegrind(monkeypatch, summary, *, exit_status=0, header=None):
+    """Substitute the whole act of running valgrind, writing its output file."""
+    runs = []
+    monkeypatch.setattr("metta_benchmarking.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("metta_benchmarking.os.access", lambda _path, _mode: True)
+    events = header or "Ir I1mr ILmr Dr D1mr DLmr Dw D1mw DLmw"
+
+    def spawn(argv, _environment, **_options):
+        runs.append(list(argv))
+        target = next(word for word in argv if word.startswith("--cachegrind-out-file="))
+        Path(target.split("=", 1)[1]).write_text(
+            f"events: {events}\nfn=main\n1 2 3\nsummary: {summary}\n", encoding="utf-8"
+        )
+        return exit_status, "inferences 7\n", "==1== the log\n"
+
+    monkeypatch.setattr("metta_benchmarking._spawn_and_reap", spawn)
+    return runs
+
+
+def test_measure_simulated_reads_every_run_and_its_output(monkeypatch):
+    """Every run's nine counts, in run order, beside the output it printed.
+
+    The simulated hierarchy is fixed on the command line rather than copied
+    from the host, and a controlled run starts uninstrumented, so only the
+    workload's own client requests open the window.
+    """
+    runs = _fake_cachegrind(monkeypatch, "10 1 0 5 0 0 5 0 0")
+    measured = measure_simulated(["./cases", "term-out", "600", "--controlled"],
+                                 controlled=True)
+    assert measured.events["Ir"] == (10, 10, 10)
+    assert estimated_cycles({event: counts[0] for event, counts in measured.events.items()}) == 24
+    assert measured.outputs == ("inferences 7\n",) * 3
+    assert len(runs) == 3
+    for argv in runs:
+        assert argv[:3] == ["/usr/bin/setarch", "-R", "/usr/bin/valgrind"]
+        assert {"--tool=cachegrind", "--cache-sim=yes", "--I1=32768,8,64",
+                "--D1=32768,8,64", "--LL=8388608,16,64", "--instr-at-start=no"} <= set(argv)
+        assert argv[-4:] == ["./cases", "term-out", "600", "--controlled"]
+
+
+def test_a_simulated_window_that_never_opened_is_refused(monkeypatch):
+    """A workload that never asked for the window counted nothing, and says so.
+
+    That is a build defect rather than a free workload or a busy box, so it is
+    an ordinary RuntimeError naming the header, as is a run the simulation
+    never reached, a summary without the cache events, and a failed workload.
+    """
+    _fake_cachegrind(monkeypatch, "0 0 0 0 0 0 0 0 0")
+    with pytest.raises(RuntimeError, match="window never opened"):
+        measure_simulated(["./cases", "term-out", "600", "--controlled"], controlled=True)
+    _fake_cachegrind(monkeypatch, "10", header="Ir")
+    with pytest.raises(RuntimeError, match="cache simulation did not run"):
+        measure_simulated(["./cases", "boot", "1"])
+    _fake_cachegrind(monkeypatch, "10 1 0 5 0 0 5 0 0", exit_status=1)
+    with pytest.raises(RuntimeError, match="failed under cachegrind with exit 1"):
+        measure_simulated(["./cases", "boot", "1"])
+    monkeypatch.setattr("metta_benchmarking.shutil.which", lambda _name: None)
+    with pytest.raises(FileNotFoundError, match="valgrind is required"):
+        measure_simulated(["./cases", "boot", "1"])
 
 
 def test_perf_timeout_kills_and_reaps_process_group(monkeypatch):  # noqa: D103  -- pytest discovers or injects this callable; its descriptive name states the contract
@@ -591,7 +675,6 @@ def test_the_controlled_window_holds_the_cyclic_collector_off(monkeypatch):
     assert gc.isenabled() is was_enabled
 
 
-
 def test_the_controlled_window_holds_the_prolog_gc_thread_off(monkeypatch):
     """SWI's gc thread is stopped for the window and started again after it.
 
@@ -630,7 +713,6 @@ def test_the_controlled_window_holds_the_prolog_gc_thread_off(monkeypatch):
         "operation",
         ("set_prolog_gc_thread", "true"),
     ]
-
 
 
 def test_perf_workload_teardown_runs_after_failure(monkeypatch):  # noqa: D103  -- pytest discovers or injects this callable; its descriptive name states the contract
@@ -1115,15 +1197,13 @@ def test_a_subset_updater_verifies_without_restamping(tmp_path):  # noqa: D103  
     assert "counter_configuration" not in json.loads(bare.read_text())
 
 
-def test_the_recording_cpu_door_never_compares_where_the_gating_one_does(tmp_path):
-    """Two CPU doors, and the difference between them is the whole point.
+def test_cpu_seconds_are_recorded_and_never_compared(tmp_path):
+    """CPU time is written beside a row's pins and never refereed.
 
-    observe_measurement(CPU_SECONDS) GATES: a moved number is a regression or a
-    stale pin, at the cost of a band wide enough for a counter that moves with
-    frequency scaling and with what else the box is doing. observe_cpu RECORDS:
-    the number is written and never refereed, which is what a row wants whose
-    verdict belongs to instructions:u. A seat picks one per row, and picking is
-    a statement about whether that row's CPU number can decide anything.
+    A time reading prices the queue as well as the work, and the box these
+    gates run on is never quiet, so the row's verdict belongs to its counts:
+    instructions:u, and estimated cycles where the row crosses a foreign
+    boundary.
     """
     path = tmp_path / "baseline.json"
     updating = BenchmarkBaseline(path, update=True)
@@ -1282,20 +1362,6 @@ def test_a_declared_inference_allowance_survives_a_re_pin(tmp_path):
     written = json.loads(path.read_text(encoding="utf-8"))["benchmarks"]["boot"]
     assert written["inferences"] == 1100
     assert written["inference_allowance"] == 32
-
-
-def test_a_time_derived_counter_stops_deciding_on_an_oversubscribed_box():
-    """One runnable process per core is where task-clock stops pricing the work.
-
-    Below it every runnable process still has a core; above it the reading
-    prices the queue. The C seat's baseline records its CPU pins as taken at
-    loadavg 9 to 30 on a 32-core box, 0.28 to 0.94 of a core each, and records
-    what happens further up: a task-clock triple spread 38% to 64% at loadavg
-    30 while instructions:u over the same runs spread 0.00002% to 0.129%.
-    """
-    assert LOAD_PER_CORE_CEILING == 1.0
-    assert load_per_core() >= 0.0
-    assert time_is_measurable() == (load_per_core() <= LOAD_PER_CORE_CEILING)
 
 
 def test_one_line_decides_whether_a_refusal_is_also_red(monkeypatch):

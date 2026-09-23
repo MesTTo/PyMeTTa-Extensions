@@ -1,6 +1,6 @@
 """Purpose: keep location-sensitive boot pins separate from runtime comparisons.
 
-Guarantees: both boot counters decline a different checkout shape, including
+Guarantees: every boot counter declines a different checkout shape, including
 updates, while comparable boot and runtime regressions still fail
 [tested: test_boot_path_refuses_both_counters_and_preserves_pins,
 test_comparable_counters_still_gate; commit=8ca8a387fc61d0918484b19a1a3baf85b6523043].
@@ -42,9 +42,9 @@ def driver(request, monkeypatch, tmp_path):
                         'checkout_path_reason': 'non-monotonic inventory sensitivity'},
         'benchmarks': {name: {'unit': 'boot', 'operations': 1, 'inferences': 100,
                               'boot_qlf_count': 21,
-                              'instructions': 1000, 'cpu_seconds': 0.01,
+                              'instructions': 1000, 'estimated_cycles': 2000,
                               'instruction_noise_percent': 1.0,
-                              'cpu_noise_percent': 10.0}
+                              'estimated_cycles_noise_percent': 1.0}
                        for name in ('boot', 'work')},
     }))
     counts = {'boot': 100, 'work': 100}
@@ -73,11 +73,12 @@ def driver(request, monkeypatch, tmp_path):
         monkeypatch.setattr(module, 'warm', lambda: None)
         monkeypatch.setattr(module, 'prepare_governed_artifacts',
                             lambda _root: ('engine/metta.qlf',) * 21)
-        monkeypatch.setattr(module, 'time_is_measurable', lambda: True)
         monkeypatch.setattr(module, 'seats_differing_from_head', lambda: [])
         monkeypatch.setattr(module, 'sample', lambda case, _rounds:
                             ((counts[case.name] * 10,) * 3, (0.01,) * 3,
                              (counts[case.name],) * 3))
+        monkeypatch.setattr(module, 'simulate', lambda case, _rounds:
+                            (counts[case.name] * 20,) * 3)
         update_flag = '--update'
     return SimpleNamespace(module=module, counts=counts, baseline=baseline,
                            update_flag=update_flag)
@@ -105,7 +106,8 @@ def test_boot_path_refuses_both_counters_and_preserves_pins(
     assert 'canonical length 29, depth 5' in reported
     assert 'non-monotonic inventory sensitivity' in reported
     pinned = json.loads(driver.baseline.read_text())['benchmarks']['boot']
-    assert (pinned['inferences'], pinned['instructions']) == (100, 1000)
+    assert (pinned['inferences'], pinned['instructions'], pinned['estimated_cycles']) == (
+        100, 1000, 2000)
 
 
 @pytest.mark.parametrize('moved', ['boot', 'work'])
@@ -214,23 +216,28 @@ def test_c_inventory_failure_is_fatal_and_runtime_still_compares(
     baseline_path.write_text(json.dumps({'schema': 1, 'benchmarks': {
         'boot': {'boot_qlf_count': 21, 'unit': 'boot', 'operations': 1,
                  'inferences': 100, 'instructions': 1000, 'instruction_noise_percent': 1,
-                 'cpu_seconds': 0.01, 'cpu_noise_percent': 10},
+                 'estimated_cycles': 2000, 'estimated_cycles_noise_percent': 1},
         'work': {'unit': 'work', 'operations': 1, 'inferences': 100,
                  'instructions': 1000, 'instruction_noise_percent': 1,
-                 'cpu_seconds': 0.01, 'cpu_noise_percent': 10},
+                 'estimated_cycles': 2000, 'estimated_cycles_noise_percent': 1},
     }}))
     baseline = module.BenchmarkBaseline(baseline_path, update=update)
     monkeypatch.setattr(module, 'ROOT', tmp_path)
-    monkeypatch.setattr(module, 'time_is_measurable', lambda: True)
     monkeypatch.setattr(module, 'prepare_governed_artifacts',
                         lambda _root: ('engine/metta.qlf',) * 22)
     sampled = []
+    simulated = []
 
     def sample(case, rounds):
         sampled.append(case.name)
         return ((1000,) * rounds, (0.01,) * rounds, (100,) * rounds)
 
+    def simulate(case, rounds):
+        simulated.append(case.name)
+        return (2000,) * rounds
+
     monkeypatch.setattr(module, 'sample', sample)
+    monkeypatch.setattr(module, 'simulate', simulate)
     failures, refused = module.observe_all(baseline, (
         module.Case('boot', 'boot', 1, whole_process=True),
         module.Case('work', 'work', 1),
@@ -238,6 +245,6 @@ def test_c_inventory_failure_is_fatal_and_runtime_still_compares(
     baseline.finish()
     assert len(failures) == 1 and 'governed QLF inventory 22; pinned 21' in failures[0]
     assert not refused
-    assert sampled == ['work']
+    assert sampled == simulated == ['work']
     assert 'REFUSED' in capsys.readouterr().out
     assert json.loads(baseline_path.read_text())['benchmarks']['boot']['inferences'] == 100
