@@ -59,7 +59,7 @@ Guarantees:
   - a workload named with a directory part is the file it names, which the
     PATH does not decide, and a name that resolves to no executable is refused
     before a tool starts, saying which of the two it was [tested:
-    test_a_workload_named_by_its_path_is_the_file_it_names; commit=WORKTREE]
+    test_a_workload_named_by_its_path_is_the_file_it_names; commit=da3652cbdda10db2a5823a9d2d3ecb5f6305a089]
   - an instruction pin and an estimated-cycle pin are ONE mechanism under two
     Metric declarations, so a counter that crosses a foreign boundary is gated
     on both, which is the only safe reading there: foreign code retires no
