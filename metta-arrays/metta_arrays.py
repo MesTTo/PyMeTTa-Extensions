@@ -278,7 +278,7 @@ metta_broadcast_dimension(D2, D1, D) :-
 _SHAPED_TENSOR_RULE_NAME: Final[str] = "metta-arrays-shaped-dltensor-base"
 _SHAPED_TENSOR_RULE: Final[str] = (
     f"!(add-typing-rule! {_SHAPED_TENSOR_RULE_NAME} ordinary "
-    "(Annotated DLTensor (Shape $shape)) DLTensor accept)"
+    "(Annotated DLTensor (Shape $shape)) DLTensor Accept)"
 )
 
 
