@@ -56,6 +56,10 @@ Guarantees:
     test_a_counting_tool_starts_the_workload_the_measurement_path_names,
     test_cachegrind_starts_the_workload_the_measurement_path_names;
     commit=310b6a9a2da78cf14d3cbc2919cc1eb88b05f096]
+  - a workload named with a directory part is the file it names, which the
+    PATH does not decide, and a name that resolves to no executable is refused
+    before a tool starts, saying which of the two it was [tested:
+    test_a_workload_named_by_its_path_is_the_file_it_names; commit=WORKTREE]
   - an instruction pin and an estimated-cycle pin are ONE mechanism under two
     Metric declarations, so a counter that crosses a foreign boundary is gated
     on both, which is the only safe reading there: foreign code retires no
@@ -1314,10 +1318,15 @@ def _workload(command: Sequence[str], environment: Mapping[str, str]) -> list[st
     patched swipl first on PATH]. Resolved here, once, for every tool, the
     workload is the one the measurement environment names; a name that PATH
     does not hold is refused rather than left for the tool to find elsewhere.
+    A name with a directory part, such as a driver started as `./cases`, is
+    the file it names: shutil.which checks such a name where it points and
+    never searches PATH for it.
     """
     resolved = shutil.which(command[0], path=environment.get("PATH", os.defpath))
     if resolved is None:
-        msg = f"{command[0]} is not on the measurement environment's PATH"
+        where = ("names no executable file" if os.sep in command[0]
+                 else "is not on the measurement environment's PATH")
+        msg = f"{command[0]} {where}"
         raise FileNotFoundError(msg)
     return [resolved, *command[1:]]
 

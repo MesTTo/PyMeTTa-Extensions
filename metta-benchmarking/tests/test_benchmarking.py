@@ -61,6 +61,7 @@ from metta_benchmarking import (
     _run_cachegrind,
     _run_perf,
     _spawn_and_reap,
+    _workload,
     benchmark_case,
     benchmark_counter_slope,
     count_atoms,
@@ -511,10 +512,20 @@ def test_estimated_cycles_prices_each_access_by_the_level_that_served_it():
     assert estimated_cycles(term_out) == 1134056847
 
 
+def _which(name, **_options):
+    """shutil.which for a test that substitutes the whole act of running a tool.
+
+    Every bare name answers as installed under /usr/bin, and a name with a
+    directory part comes back as given, because shutil.which checks such a name
+    where it points instead of searching PATH.
+    """
+    return name if os.sep in name else f"/usr/bin/{name}"
+
+
 def _fake_cachegrind(monkeypatch, summary, *, exit_status=0, header=None):
     """Substitute the whole act of running valgrind, writing its output file."""
     runs = []
-    monkeypatch.setattr("metta_benchmarking.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("metta_benchmarking.shutil.which", _which)
     monkeypatch.setattr("metta_benchmarking.os.access", lambda _path, _mode: True)
     events = header or "Ir I1mr ILmr Dr D1mr DLmr Dw D1mw DLmw"
 
@@ -567,7 +578,7 @@ def test_a_simulated_window_that_never_opened_is_refused(monkeypatch):
     _fake_cachegrind(monkeypatch, "10 1 0 5 0 0 5 0 0", exit_status=1)
     with pytest.raises(RuntimeError, match="failed under cachegrind with exit 1"):
         measure_simulated(["./cases", "boot", "1"])
-    monkeypatch.setattr("metta_benchmarking.shutil.which", lambda _name: None)
+    monkeypatch.setattr("metta_benchmarking.shutil.which", lambda _name, **_options: None)
     with pytest.raises(FileNotFoundError, match="valgrind is required"):
         measure_simulated(["./cases", "boot", "1"])
 
@@ -580,7 +591,7 @@ def test_perf_timeout_kills_and_reaps_process_group(monkeypatch):  # noqa: D103 
     # This test substitutes the whole act of running a process; the tools it
     # would have run are part of that, and requiring them installed would make
     # a timeout-and-reap test depend on the machine having perf.
-    monkeypatch.setattr("metta_benchmarking.shutil.which", lambda name, path=None: f"/usr/bin/{name}")
+    monkeypatch.setattr("metta_benchmarking.shutil.which", _which)
     monkeypatch.setattr("metta_benchmarking.os.access", lambda _path, _mode: True)
 
     def waitpid(process, options):
@@ -624,7 +635,7 @@ def _tools_present(monkeypatch):
 
 
 def test_a_counting_tool_starts_the_workload_the_measurement_path_names(monkeypatch, tmp_path):
-    """perf is handed the workload ABSOLUTE, as the measurement PATH resolves it.
+    """The workload reaches perf ABSOLUTE, as the measurement PATH resolves it.
 
     perf puts its own directories ahead of the PATH it passes to the workload,
     so a bare `true` would start /usr/bin/true whatever the measurement
@@ -645,6 +656,26 @@ def test_a_counting_tool_starts_the_workload_the_measurement_path_names(monkeypa
     with pytest.raises(FileNotFoundError, match="not on the measurement environment's PATH"):
         _run_perf(["no-such-workload"], {"PATH": str(workload.parent)},
                   controlled=False, timeout=1.0, events=("instructions:u",))
+
+
+def test_a_workload_named_by_its_path_is_the_file_it_names(monkeypatch, tmp_path):
+    """A driver started as ./cases is the one it names, whatever PATH holds.
+
+    shutil.which checks a name with a directory part where it points and never
+    searches PATH, so the measured workload is that file; a path naming no
+    executable is refused before any tool starts, and the refusal says a file
+    is missing rather than that PATH lacks it.
+    """
+    driver = tmp_path / "cases"
+    driver.write_text("#!/bin/sh\n", encoding="utf-8")
+    driver.chmod(0o755)
+    monkeypatch.chdir(tmp_path)
+    elsewhere = {"PATH": str(tmp_path / "empty")}
+    assert _workload(["./cases", "boot", "1"], elsewhere) == ["./cases", "boot", "1"]
+    with pytest.raises(FileNotFoundError, match=r"^\./absent names no executable file$"):
+        _workload(["./absent"], elsewhere)
+    with pytest.raises(FileNotFoundError, match=r"^cases is not on the measurement environment's PATH$"):
+        _workload(["cases"], elsewhere)
 
 
 def test_cachegrind_starts_the_workload_the_measurement_path_names(monkeypatch, tmp_path):
@@ -1512,7 +1543,7 @@ def test_collecting_reports_every_finding(tmp_path):  # noqa: D103  -- pytest di
 def test_perf_refuses_off_linux_before_it_spawns(monkeypatch, platform):
     """perf_event_open is Linux's, so perf is refused elsewhere with that reason and nothing starts."""
     spawned = []
-    monkeypatch.setattr("metta_benchmarking.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("metta_benchmarking.shutil.which", _which)
     monkeypatch.setattr("metta_benchmarking.os.access", lambda _path, _mode: True)
     monkeypatch.setattr("metta_benchmarking._spawn_and_reap", lambda *args, **_options: spawned.append(args))
     monkeypatch.setattr("metta_benchmarking.sys.platform", platform)
