@@ -48,6 +48,22 @@ run GATE   ext-interrogate bounded "$PY" -m interrogate -c "$HERE/pyproject.toml
 # Owner: ext; this lane checks only this component.
 run GATE fetch-source-selftest sh "$HERE/tools/pymetta-host/fetch_selftest.sh"
 
+# The host build skips its two compile stages when OUT already holds their
+# output for exactly this tree's inputs, which is how a release reuses a host
+# built earlier the same day. A key missing one input would let a home built
+# from other patches or other cmake arguments into a published wheel, and a
+# record left by a half-finished build would vouch for a half-built OUT. This
+# drives run.sh with docker and fetch-source.sh stubbed, so it needs neither.
+# Owner: ext; this lane checks only this component.
+run GATE host-reuse-selftest sh "$HERE/tools/pymetta-host/run_selftest.sh"
+
+# And the lane above must be able to FAIL: each rule run.sh keeps is taken
+# away in turn, one mutant per rule beside an unmutated control, and the
+# self-test has to go red for every one, as evidence-mutations does for the
+# evidence gate.
+# Owner: ext; this lane checks only this component.
+run GATE host-reuse-mutants "$PY" "$HERE/tests/checks/check_host_reuse_mutations.py"
+
 # A wheel cannot carry a symlink, so every alias in a staged tree reaches the
 # user as a full copy, and a copy of a position-dependent ELF carries an RPATH
 # for a directory it is no longer in. That shipped once: the host wheel then
