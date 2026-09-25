@@ -79,3 +79,19 @@ run GATE host-bundle "$PY" "$HERE/tests/checks/check_host_bundle.py" \
     $(ls "$HERE"/ai-tmp/host-build/dist/pymetta-*-manylinux*.whl 2>/dev/null)
 # Owner: ext; this lane checks only this component.
 run GATE host-bundle-selftest "$PY" "$HERE/tests/checks/check_host_bundle_selftest.py"
+
+# A wheel that passes the lane above can still rewrite itself on its first
+# boot: SWI-Prolog 10.1.14 recompiled a bundled library .qlf whenever its .pl
+# read newer, and a wheel carries no times an installer honours, so a fresh uv
+# install of pymetta 0.9.2 rewrote up to 51 of them inside site-packages. This
+# installs each wheel at two paths with every bundled .qlf dated before its
+# source, boots it, and requires every installed file untouched. pip runs with
+# --no-index from the wheelhouse tools/pymetta-host/assemble.sh fills beside
+# the wheels, so the lane reaches no network; with no wheel built it measured
+# nothing and says so with 125.
+# Owner: ext; this lane checks only this component.
+run GATE wheel-first-boot "$PY" "$HERE/tests/checks/check_wheel_first_boot.py" \
+    --find-links "$HERE/ai-tmp/host-build/wheelhouse" \
+    $(ls "$HERE"/ai-tmp/host-build/dist/pymetta-*-manylinux*.whl 2>/dev/null)
+# Owner: ext; this lane checks only this component.
+run GATE wheel-first-boot-selftest "$PY" "$HERE/tests/checks/check_wheel_first_boot_selftest.py"
